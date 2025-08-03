@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, MapPin, Users } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
@@ -15,6 +15,8 @@ type Activity = {
   category: string;
   location: string;
   created_by: string;
+  class: string;
+  department: string;
 };
 
 type Student = {
@@ -29,6 +31,7 @@ const FacultyCC = () => {
   const { user } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
@@ -65,7 +68,7 @@ const FacultyCC = () => {
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('created_by', user.uid) // Use user.uid (TEXT) instead of user.user_id (UUID)
+        .eq('created_by', user.uid)
         .eq('category', 'Co-curricular')
         .order('date', { ascending: false });
 
@@ -94,7 +97,7 @@ const FacultyCC = () => {
     try {
       const { error } = await supabase.from('events').insert({
         ...formData,
-        created_by: user.uid, // Use user.uid (TEXT)
+        created_by: user.uid,
       });
 
       if (error) {
@@ -123,13 +126,115 @@ const FacultyCC = () => {
     }
   };
 
+  const updateActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid || !selectedActivity) {
+      setError('User not logged in or no activity selected');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const updateData = {
+        title: formData.title,
+        description: formData.description,
+        date: formData.date || selectedActivity.date,
+        time: formData.time,
+        venue: formData.venue,
+        location: formData.location,
+        category: formData.category,
+        class: formData.class,
+        department: formData.department,
+      };
+
+      const { error } = await supabase
+        .from('events')
+        .update(updateData)
+        .eq('event_id', selectedActivity.event_id)
+        .eq('created_by', user.uid);
+
+      if (error) {
+        console.error('Error updating activity:', error);
+        throw new Error(`Failed to update activity: ${error.message}`);
+      }
+
+      setShowEditForm(false);
+      setSelectedActivity(null);
+      setFormData({
+        title: '',
+        description: '',
+        date: '',
+        time: '',
+        venue: '',
+        category: 'Co-curricular',
+        location: '',
+        class: '',
+        department: user?.department || '',
+      });
+      await fetchActivities();
+    } catch (err: any) {
+      console.error('Activity update error:', err);
+      setError(err.message || 'An unexpected error occurred while updating the activity.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteActivity = async (eventId: string) => {
+    if (!user?.uid) {
+      setError('User not logged in');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('event_id', eventId)
+        .eq('created_by', user.uid);
+
+      if (error) {
+        console.error('Error deleting activity:', error);
+        throw new Error(`Failed to delete activity: ${error.message}`);
+      }
+
+      await fetchActivities();
+    } catch (err: any) {
+      console.error('Activity deletion error:', err);
+      setError(err.message || 'An unexpected error occurred while deleting the activity.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditClick = (activity: Activity) => {
+    setSelectedActivity(activity);
+    setFormData({
+      title: activity.title,
+      description: activity.description,
+      date: activity.date,
+      time: activity.time,
+      venue: activity.venue,
+      category: activity.category,
+      location: activity.location,
+      class: activity.class,
+      department: activity.department,
+    });
+    setShowEditForm(true);
+  };
+
   const fetchStudents = async (activity: Activity) => {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('user_id, name, uid, year, email')
         .eq('role', 'Student')
-        .eq('year', formData.class || '1');
+        .eq('year', activity.class || '1');
 
       if (error) {
         console.error('Error fetching students:', error);
@@ -171,7 +276,7 @@ const FacultyCC = () => {
         user_id: studentId,
         event_id: selectedActivity.event_id,
         status: isPresent ? 'Present' : 'Absent',
-        marked_by: user.uid, // Use user.uid (TEXT)
+        marked_by: user.uid,
       });
 
       if (error) {
@@ -300,6 +405,103 @@ const FacultyCC = () => {
         </motion.div>
       )}
 
+      {showEditForm && selectedActivity && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+        >
+          <h2 className="text-xl font-semibold mb-4">Edit Activity</h2>
+          <form onSubmit={updateActivity} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Activity Title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Class (e.g., 1, 2, 3, 4)"
+                value={formData.class}
+                onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <input
+                type="time"
+                value={formData.time}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Venue"
+                value={formData.venue}
+                onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Location"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <textarea
+              placeholder="Activity Description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+            <div className="flex space-x-3">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {isLoading ? 'Updating...' : 'Update Activity'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditForm(false);
+                  setSelectedActivity(null);
+                  setFormData({
+                    title: '',
+                    description: '',
+                    date: '',
+                    time: '',
+                    venue: '',
+                    category: 'Co-curricular',
+                    location: '',
+                    class: '',
+                    department: user?.department || '',
+                  });
+                }}
+                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      )}
+
       <div className="space-y-4">
         {activities.map((activity) => (
           <motion.div
@@ -313,13 +515,35 @@ const FacultyCC = () => {
                 <h3 className="text-xl font-semibold text-gray-800">{activity.title}</h3>
                 <p className="text-gray-600 mt-1">{activity.description}</p>
               </div>
-              <button
-                onClick={() => fetchStudents(activity)}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-green-700 transition-colors"
-              >
-                <Users className="w-4 h-4" />
-                <span>Mark Attendance</span>
-              </button>
+              <div className="flex space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleEditClick(activity)}
+                  className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors flex items-center space-x-1"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span>Edit</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => deleteActivity(activity.event_id)}
+                  className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors flex items-center space-x-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => fetchStudents(activity)}
+                  className="bg-teal-100 text-teal-600 px-3 py-1 rounded text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Attendance</span>
+                </motion.button>
+              </div>
             </div>
 
             <div className="flex items-center space-x-6 text-sm text-gray-600">
@@ -338,7 +562,7 @@ const FacultyCC = () => {
         ))}
       </div>
 
-      {selectedActivity && (
+      {selectedActivity && !showEditForm && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

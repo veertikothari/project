@@ -13,6 +13,12 @@ type User = {
   uid: string | null
 }
 
+type CEPRequirement = {
+  year: string
+  hours_required: number
+  deadline: string | null
+}
+
 type AuthContextType = {
   user: User | null
   login: (email: string, uid: string) => Promise<boolean>

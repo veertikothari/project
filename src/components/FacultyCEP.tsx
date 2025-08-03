@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Settings, Eye, Clock, CheckCircle, Users } from 'lucide-react'
+import { Settings, Eye, Clock, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -8,6 +8,7 @@ type CEPRequirement = {
   year: string
   hours_required: number
   deadline: string | null
+  department: string
 }
 
 type StudentSubmission = {
@@ -15,6 +16,7 @@ type StudentSubmission = {
   name: string
   uid: string
   year: string
+  department: string
   total_hours: number
   submissions: Array<{
     submission_id: string
@@ -33,32 +35,54 @@ const FacultyCEP = () => {
   const [formData, setFormData] = useState({
     year: '1',
     hours_required: 20,
-    deadline: ''
+    deadline: '',
+    department: user?.department || ''
   })
 
   useEffect(() => {
+    if (!user?.department) {
+      console.error('User department not found')
+      return
+    }
     fetchRequirements()
     fetchSubmissions()
-  }, [])
+  }, [user?.department])
 
   const fetchRequirements = async () => {
+    if (!user?.department) {
+      console.error('User department not found')
+      return
+    }
+
     const { data, error } = await supabase
       .from('cep_requirements')
       .select('*')
+      .eq('department', user.department)
       .order('year')
 
     if (!error && data) {
       setRequirements(data)
+    } else {
+      console.error('Error fetching requirements:', error)
     }
   }
 
   const fetchSubmissions = async () => {
+    if (!user?.department) {
+      console.error('User department not found')
+      return
+    }
+
     const { data: studentsData, error: studentsError } = await supabase
       .from('users')
-      .select('user_id, name, uid, year')
+      .select('user_id, name, uid, year, department')
       .eq('role', 'Student')
+      .eq('department', user.department)
 
-    if (studentsError || !studentsData) return
+    if (studentsError || !studentsData) {
+      console.error('Error fetching students:', studentsError)
+      return
+    }
 
     const submissionsWithStudents = await Promise.all(
       studentsData.map(async (student) => {
@@ -83,9 +107,17 @@ const FacultyCEP = () => {
   const updateRequirement = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!user?.department) {
+      console.error('User department not found')
+      return
+    }
+
     const { error } = await supabase
       .from('cep_requirements')
-      .upsert(formData)
+      .upsert({
+        ...formData,
+        department: user.department
+      })
 
     if (!error) {
       setShowRequirementForm(false)
@@ -93,16 +125,29 @@ const FacultyCEP = () => {
       setFormData({
         year: '1',
         hours_required: 20,
-        deadline: ''
+        deadline: '',
+        department: user.department
       })
+    } else {
+      console.error('Error updating requirement:', error)
     }
   }
 
+  if (!user?.department) {
+    return (
+      <div className="text-red-600 p-6">
+        Error: Faculty department not found. Please contact support.
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Cultural Engagement Program</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Community Engagement Program - {user.department}
+          </h1>
           <p className="text-gray-600">Manage social service requirements and track student progress</p>
         </div>
         <motion.button
@@ -123,19 +168,23 @@ const FacultyCEP = () => {
         className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-200"
       >
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Current Requirements by Year</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {requirements.map((req) => (
-            <div key={req.year} className="bg-white rounded-lg p-4 border border-teal-100">
-              <div className="text-sm text-gray-600">Year {req.year}</div>
-              <div className="text-2xl font-bold text-teal-600">{req.hours_required} hrs</div>
-              {req.deadline && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Due: {new Date(req.deadline).toLocaleDateString()}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        {requirements.length === 0 ? (
+          <div className="text-gray-600">No requirements set for {user.department}.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {requirements.map((req) => (
+              <div key={req.year} className="bg-white rounded-lg p-4 border border-teal-100">
+                <div className="text-sm text-gray-600">Year {req.year}</div>
+                <div className="text-2xl font-bold text-teal-600">{req.hours_required} hrs</div>
+                {req.deadline && (
+                  <div className="text-sm text-gray-600 mt-1">
+                    Due: {new Date(req.deadline).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       {/* Requirements Form */}
@@ -205,73 +254,76 @@ const FacultyCEP = () => {
       {/* Student Submissions */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-gray-800">Student Submissions</h2>
-        
-        {submissions.map((submission) => {
-          const requirement = requirements.find(req => req.year === submission.year)
-          const requiredHours = requirement?.hours_required || 20
-          const isCompleted = submission.total_hours >= requiredHours
+        {submissions.length === 0 ? (
+          <div className="text-gray-600">No students found in {user.department}.</div>
+        ) : (
+          submissions.map((submission) => {
+            const requirement = requirements.find(req => req.year === submission.year)
+            const requiredHours = requirement?.hours_required || 20
+            const isCompleted = submission.total_hours >= requiredHours
 
-          return (
-            <motion.div
-              key={submission.user_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">{submission.name}</h3>
-                  <p className="text-gray-600">UID: {submission.uid} | Year: {submission.year}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-600">Progress</div>
-                  <div className={`text-lg font-bold ${isCompleted ? 'text-green-600' : 'text-orange-600'}`}>
-                    {submission.total_hours} / {requiredHours} hours
+            return (
+              <motion.div
+                key={submission.user_id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">{submission.name}</h3>
+                    <p className="text-gray-600">UID: {submission.uid} | Year: {submission.year}</p>
                   </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">Progress</span>
-                  <span className="text-sm font-medium">
-                    {Math.round((submission.total_hours / requiredHours) * 100)}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      isCompleted ? 'bg-green-500' : 'bg-orange-500'
-                    }`}
-                    style={{ width: `${Math.min((submission.total_hours / requiredHours) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <div className="flex items-center space-x-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{submission.submissions.length} submissions</span>
-                  </div>
-                  {isCompleted && (
-                    <div className="flex items-center space-x-1 text-green-600">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Completed</span>
+                  <div className="text-right">
+                    <div className="text-sm text-gray-600">Progress</div>
+                    <div className={`text-lg font-bold ${isCompleted ? 'text-green-600' : 'text-orange-600'}`}>
+                      {submission.total_hours} / {requiredHours} hours
                     </div>
-                  )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => setSelectedSubmission(submission)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>View Details</span>
-                </button>
-              </div>
-            </motion.div>
-          )
-        })}
+
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">Progress</span>
+                    <span className="text-sm font-medium">
+                      {Math.round((submission.total_hours / requiredHours) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        isCompleted ? 'bg-green-500' : 'bg-orange-500'
+                      }`}
+                      style={{ width: `${Math.min((submission.total_hours / requiredHours) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-4 h-4" />
+                      <span>{submission.submissions.length} submissions</span>
+                    </div>
+                    {isCompleted && (
+                      <div className="flex items-center space-x-1 text-green-600">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Completed</span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedSubmission(submission)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>View Details</span>
+                  </button>
+                </div>
+              </motion.div>
+            )
+          })
+        )}
       </div>
 
       {/* Submission Details Modal */}

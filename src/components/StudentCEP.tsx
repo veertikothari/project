@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Clock, FileText, Plus } from 'lucide-react';
+import { Upload, Clock, FileText, Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,6 +12,8 @@ type CEPRequirement = {
 
 type Submission = {
   submission_id: string;
+  title: string;
+  activity_date: string;
   hours: number;
   file_url: string;
   submitted_at: string;
@@ -24,132 +26,162 @@ const StudentCEP = () => {
   const [completedHours, setCompletedHours] = useState(0);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingSubmission, setEditingSubmission] = useState<Submission | null>(null);
   const [formData, setFormData] = useState({
+    title: '',
+    activity_date: '',
     hours: 0,
     file: null as File | null,
   });
 
   useEffect(() => {
     if (user?.year && user?.user_id) {
-      console.log('User:', { user_id: user.user_id, year: user.year, yearType: typeof user.year });
       fetchRequirement();
       fetchSubmissions();
     } else {
-      console.warn('No user or user.year/user_id defined:', user);
       alert('User information is missing. Please ensure user data is provided.');
     }
   }, [user]);
 
   const fetchRequirement = async () => {
-    if (!user?.year) {
-      console.warn('No user.year defined');
-      return;
-    }
-
+    if (!user?.year) return;
     try {
       const { data, error } = await supabase
         .from('cep_requirements')
         .select('*')
-        .eq('year', String(user.year)); // Ensure year is a string
-
-      if (error) {
-        console.error('Error fetching requirement:', error);
-        alert(`Failed to fetch requirements: ${error.message || 'Unknown error'}`);
-        return;
-      }
-
+        .eq('year', String(user.year));
+      if (error) throw error;
       if (data && data.length > 0) {
         setRequirement(data[0]);
       } else {
-        console.warn('No requirement found for year:', user.year);
         setRequirement(null);
       }
-    } catch (error) {
-      console.error('Unexpected error fetching requirement:', error);
-      alert('An unexpected error occurred while fetching requirements.');
+    } catch (error: any) {
+      alert(`Failed to fetch requirements: ${error.message || 'Unknown error'}`);
     }
   };
 
   const fetchSubmissions = async () => {
-    if (!user?.user_id) {
-      console.warn('No user.user_id defined');
-      return;
-    }
-
+    if (!user?.user_id) return;
     try {
       const { data, error } = await supabase
         .from('cep_submissions')
         .select('*')
-        .eq('user_id', user.user_id) // Use user_id from context
+        .eq('user_id', user.user_id)
         .order('submitted_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching submissions:', error);
-        alert(`Failed to fetch submissions: ${error.message || 'Unknown error'}`);
-        return;
-      }
-
+      if (error) throw error;
       if (data) {
         setSubmissions(data);
         const totalHours = data.reduce((sum, sub) => sum + (sub.hours || 0), 0);
         setCompletedHours(totalHours);
       }
-    } catch (error) {
-      console.error('Unexpected error fetching submissions:', error);
-      alert('An unexpected error occurred while fetching submissions.');
+    } catch (error: any) {
+      alert(`Failed to fetch submissions: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleEdit = (submission: Submission) => {
+    setEditingSubmission(submission);
+    setFormData({
+      title: submission.title,
+      activity_date: submission.activity_date.split('T')[0],
+      hours: submission.hours,
+      file: null
+    });
+    setShowUploadForm(true);
+  };
+
+  const handleDelete = async (submission: Submission) => {
+    if (!window.confirm('Are you sure you want to delete this submission?')) return;
+
+    setIsLoading(true);
+    try {
+      // Delete file from storage if it exists
+      if (submission.file_url) {
+        const filePath = submission.file_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('cep-files').remove([filePath]);
+      }
+
+      // Delete submission from database
+      const { error } = await supabase
+        .from('cep_submissions')
+        .delete()
+        .eq('submission_id', submission.submission_id);
+
+      if (error) throw new Error(`Deletion failed: ${error.message}`);
+      
+      await fetchSubmissions();
+    } catch (error: any) {
+      alert(`Error deleting submission: ${error.message || 'Please try again.'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.user_id || !formData.file) {
-      alert('Please ensure user ID is provided and a file is selected.');
+    if (!user?.user_id || !formData.title || !formData.activity_date || (!formData.file && !editingSubmission)) {
+      alert('Please fill all required fields and select a file.');
       return;
     }
 
     setIsLoading(true);
-
     try {
-      // Upload file to Supabase storage
-      const fileExt = formData.file.name.split('.').pop();
-      const fileName = `${user.user_id}/${Date.now()}.${fileExt}`;
+      let publicUrl = editingSubmission?.file_url || '';
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('cep-files')
-        .upload(fileName, formData.file);
+      // Handle file upload
+      if (formData.file) {
+        const fileExt = formData.file.name.split('.').pop();
+        const fileName = `${user.user_id}/${Date.now()}.${fileExt}`;
+        
+        // Upload new file
+        const { error: uploadError } = await supabase.storage
+          .from('cep-files')
+          .upload(fileName, formData.file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        if (uploadError) throw new Error(`File upload failed: ${uploadError.message}`);
+        
+        const { data: urlData } = supabase.storage
+          .from('cep-files')
+          .getPublicUrl(fileName);
+        publicUrl = urlData.publicUrl;
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw new Error(`File upload failed: ${uploadError.message}`);
+        // Delete old file if editing
+        if (editingSubmission?.file_url) {
+          const oldFilePath = editingSubmission.file_url.split('/').slice(-2).join('/');
+          await supabase.storage.from('cep-files').remove([oldFilePath]);
+        }
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('cep-files')
-        .getPublicUrl(fileName);
+      // Upsert submission
+      const submissionData = {
+        user_id: user.user_id,
+        title: formData.title,
+        activity_date: formData.activity_date,
+        hours: formData.hours,
+        file_url: publicUrl,
+        ...(editingSubmission ? {} : { submitted_at: new Date().toISOString() })
+      };
 
-      // Save submission to database
-      const { error: insertError } = await supabase
-        .from('cep_submissions')
-        .insert({
-          user_id: user.user_id, // Use user_id from context
-          hours: formData.hours,
-          file_url: publicUrl,
-        });
+      const { error } = editingSubmission
+        ? await supabase
+            .from('cep_submissions')
+            .update(submissionData)
+            .eq('submission_id', editingSubmission.submission_id)
+        : await supabase
+            .from('cep_submissions')
+            .insert(submissionData);
 
-      if (insertError) {
-        console.error('Insert error details:', insertError);
-        throw new Error(`Insert failed: ${insertError.message}`);
-      }
+      if (error) throw new Error(`Submission failed: ${error.message}`);
 
-      console.log('Submission successful for user_id:', user.user_id);
-
-      // Reset form and refresh data
-      setFormData({ hours: 0, file: null });
+      // Reset form
+      setFormData({ title: '', activity_date: '', hours: 0, file: null });
       setShowUploadForm(false);
+      setEditingSubmission(null);
       await fetchSubmissions();
     } catch (error: any) {
-      console.error('Error submitting:', error);
       alert(`Error submitting: ${error.message || 'Please try again.'}`);
     } finally {
       setIsLoading(false);
@@ -175,7 +207,7 @@ const StudentCEP = () => {
   return (
     <div className="space-y-6 pb-20">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Cultural Engagement Program</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Community Engagement Program</h1>
         <p className="text-gray-600">Complete your social service hours</p>
       </div>
 
@@ -216,7 +248,6 @@ const StudentCEP = () => {
             {completedHours} / {requirement.hours_required} hours
           </div>
         </div>
-
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-gray-600">Completion Progress</span>
@@ -235,7 +266,6 @@ const StudentCEP = () => {
             />
           </div>
         </div>
-
         {completedHours >= requirement.hours_required && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
             <div className="text-green-600 font-semibold">🎉 Congratulations!</div>
@@ -249,7 +279,11 @@ const StudentCEP = () => {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => setShowUploadForm(true)}
+          onClick={() => {
+            setEditingSubmission(null);
+            setFormData({ title: '', activity_date: '', hours: 0, file: null });
+            setShowUploadForm(true);
+          }}
           className="bg-teal-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:bg-teal-700 transition-colors shadow-lg"
         >
           <Plus className="w-5 h-5" />
@@ -257,15 +291,37 @@ const StudentCEP = () => {
         </motion.button>
       </div>
 
-      {/* Upload Form */}
+      {/* Upload/Edit Form */}
       {showUploadForm && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
         >
-          <h2 className="text-xl font-semibold mb-4">Upload Social Service Activity</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            {editingSubmission ? 'Edit Submission' : 'Upload Social Service Activity'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Activity Title</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Activity Date</label>
+              <input
+                type="date"
+                value={formData.activity_date}
+                onChange={(e) => setFormData({ ...formData, activity_date: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                required
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Hours Completed</label>
               <input
@@ -277,7 +333,6 @@ const StudentCEP = () => {
                 required
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Certificate/Proof Upload
@@ -290,7 +345,6 @@ const StudentCEP = () => {
                   onChange={(e) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
                   className="hidden"
                   id="file-upload"
-                  required
                 />
                 <label
                   htmlFor="file-upload"
@@ -299,20 +353,26 @@ const StudentCEP = () => {
                   {formData.file ? formData.file.name : 'Click to upload certificate or proof'}
                 </label>
                 <p className="text-sm text-gray-500 mt-1">PDF, JPG, PNG up to 10MB</p>
+                {editingSubmission && !formData.file && (
+                  <p className="text-sm text-gray-500 mt-1">Leave empty to keep existing file</p>
+                )}
               </div>
             </div>
-
             <div className="flex space-x-3">
               <button
                 type="submit"
                 disabled={isLoading}
                 className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
               >
-                {isLoading ? 'Submitting...' : 'Submit Activity'}
+                {isLoading ? 'Submitting...' : editingSubmission ? 'Update Submission' : 'Submit Activity'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowUploadForm(false)}
+                onClick={() => {
+                  setShowUploadForm(false);
+                  setEditingSubmission(null);
+                  setFormData({ title: '', activity_date: '', hours: 0, file: null });
+                }}
                 className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 Cancel
@@ -335,22 +395,42 @@ const StudentCEP = () => {
             >
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <div className="text-lg font-semibold text-gray-800">{submission.hours} Hours</div>
+                  <div className="text-lg font-semibold text-gray-800">{submission.title}</div>
+                  <div className="text-sm text-gray-600">
+                    Activity Date: {new Date(submission.activity_date).toLocaleDateString()}
+                  </div>
+                  <div className="text-sm text-gray-600">Hours: {submission.hours}</div>
                   <div className="text-sm text-gray-600">
                     Submitted: {new Date(submission.submitted_at).toLocaleDateString()}
                   </div>
                 </div>
-                {submission.file_url && (
-                  <a
-                    href={submission.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-teal-100 text-teal-600 px-3 py-1 rounded text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1"
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleEdit(submission)}
+                    className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors flex items-center space-x-1"
                   >
-                    <FileText className="w-4 h-4" />
-                    <span>View File</span>
-                  </a>
-                )}
+                    <Edit className="w-4 h-4" />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(submission)}
+                    className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors flex items-center space-x-1"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete</span>
+                  </button>
+                  {submission.file_url && (
+                    <a
+                      href={submission.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-teal-100 text-teal-600 px-3 py-1 rounded text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>View File</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </motion.div>
           ))}

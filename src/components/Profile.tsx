@@ -44,7 +44,7 @@ const Profile = () => {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-gray-800">Profile Information</h2>
           
-          {/* <button
+          {/*<button
             onClick={() => setIsEditing(!isEditing)}
             className="text-blue-600 hover:text-blue-700 flex items-center space-x-1"
           >
@@ -128,7 +128,7 @@ const Profile = () => {
               <div className="text-sm text-gray-600">CC Activities</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-teal-600">hours</div>
+              <div className="text-2xl font-bold text-teal-600">10</div>
               <div className="text-sm text-gray-600">CEP Hours</div>
             </div>
           </div>

@@ -26,7 +26,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-full max-h-full overflow-y-auto">
+    <div className="min-h-screen bg-gray-50 p-4 max-w-full max-h-full overflow-y-auto pb-20">
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
