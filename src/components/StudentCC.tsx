@@ -15,6 +15,7 @@ type Activity = {
   category: string
   location: string
   attendance_status?: 'Present' | 'Absent' | null
+  is_enrolled?: boolean
 }
 
 const StudentCC = () => {
@@ -35,6 +36,7 @@ const StudentCC = () => {
       .from('events')
       .select('*')
       .eq('category', 'Co-curricular')
+      .eq('department', user.department)
       .order('date', { ascending: false })
 
     if (eventsError) {
@@ -43,7 +45,7 @@ const StudentCC = () => {
     }
 
     if (eventsData) {
-      const activitiesWithAttendance = await Promise.all(
+      const activitiesWithEnrollment = await Promise.all(
         eventsData.map(async (activity) => {
           const { data: attendanceData } = await supabase
             .from('attendance')
@@ -51,19 +53,53 @@ const StudentCC = () => {
             .eq('event_id', activity.event_id)
             .eq('user_id', user.user_id)
             .single()
+          
+          const { data: enrollmentData } = await supabase
+          .from('enrollments')
+          .select('enrollment_id')
+          .eq('event_id', activity.event_id)
+          .eq('user_id', user.user_id)
+          .single();
 
           return {
             ...activity,
-            attendance_status: attendanceData?.status || null
+            attendance_status: attendanceData?.status || null,
+            is_enrolled: !!enrollmentData,
           }
         })
       )
 
-      setActivities(activitiesWithAttendance)
+      setActivities(activitiesWithEnrollment)
     }
     
     setIsLoading(false)
   }
+
+  const handleEnroll = async (eventId: string, isCurrentlyEnrolled: boolean) => {
+  if (!user?.user_id) return;
+
+  setIsLoading(true);
+  try {
+    if (isCurrentlyEnrolled) {
+      const { error } = await supabase
+        .from('enrollments')
+        .delete()
+        .eq('event_id', eventId)
+        .eq('user_id', user.user_id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('enrollments')
+        .insert({ event_id: eventId, user_id: user.user_id });
+      if (error) throw error;
+    }
+    await fetchActivities(); // Refresh the list
+  } catch (err: any) {
+    alert(`Error updating enrollment: ${err.message || 'Please try again.'}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const getAttendanceColor = (status: 'Present' | 'Absent' | null) => {
     switch (status) {
@@ -153,12 +189,26 @@ const StudentCC = () => {
                   </div>
                 </div>
 
+                <div className="flex flex-col items-end space-y-2">
                 <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${getAttendanceColor(activity.attendance_status)}`}>
                   {getAttendanceIcon(activity.attendance_status)}
                   <span>{getAttendanceText(activity.attendance_status)}</span>
                 </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activity.is_enrolled
+                      ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                      : 'bg-green-100 text-green-600 hover:bg-green-200'
+                  }`}
+                >
+                  {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
+                </motion.button>
               </div>
-            </motion.div>
+            </div>
+          </motion.div>
           ))
         )}
       </div>

@@ -12,6 +12,7 @@ const Profile = () => {
   const handleLogout = () => {
     logout()
   }
+  
 
   return (
     <motion.div

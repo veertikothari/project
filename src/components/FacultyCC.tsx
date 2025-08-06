@@ -16,7 +16,8 @@ type Activity = {
   location: string;
   created_by: string;
   class: string;
-  department: string;
+  department: string; // Changed from string[]
+  enrolled_students?: number;
 };
 
 type Student = {
@@ -35,7 +36,9 @@ const FacultyCC = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
+  const [pendingAttendance, setPendingAttendance] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
@@ -47,7 +50,7 @@ const FacultyCC = () => {
     category: 'Co-curricular',
     location: '',
     class: '',
-    department: user?.department || '',
+    department: user?.department || '', // Changed from array to string
   });
 
   useEffect(() => {
@@ -65,19 +68,57 @@ const FacultyCC = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      // First, fetch the events
+      const { data: eventsData, error: eventsError } = await supabase
         .from('events')
-        .select('*')
+        .select(`
+          event_id,
+          title,
+          description,
+          date,
+          time,
+          venue,
+          location,
+          class,
+          department
+        `)
         .eq('created_by', user.uid)
         .eq('category', 'Co-curricular')
         .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching activities:', error);
-        throw new Error(`Failed to fetch activities: ${error.message}`);
+      if (eventsError) {
+        console.error('Error fetching activities:', eventsError);
+        throw new Error(`Failed to fetch activities: ${eventsError.message}`);
       }
 
-      setActivities(data || []);
+      // Then, fetch enrollment counts for each event
+      const activitiesWithCount = await Promise.all(
+        eventsData.map(async (activity) => {
+          const { count, error: countError } = await supabase
+            .from('enrollments')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', activity.event_id);
+
+          if (countError) {
+            console.error('Error fetching enrollment count:', countError);
+            return {
+              ...activity,
+              category: 'Co-curricular',
+              created_by: user.uid,
+              enrolled_students: 0,
+            } as Activity;
+          }
+
+          return {
+            ...activity,
+            category: 'Co-curricular',
+            created_by: user.uid,
+            enrolled_students: count || 0,
+          } as Activity;
+        })
+      );
+
+      setActivities(activitiesWithCount);
     } catch (err: any) {
       console.error('Unexpected error:', err);
       setError(err.message || 'An unexpected error occurred while fetching activities.');
@@ -115,7 +156,7 @@ const FacultyCC = () => {
         category: 'Co-curricular',
         location: '',
         class: '',
-        department: user?.department || '',
+        department: user?.department || '', // String value
       });
       await fetchActivities();
     } catch (err: any) {
@@ -146,7 +187,7 @@ const FacultyCC = () => {
         location: formData.location,
         category: formData.category,
         class: formData.class,
-        department: formData.department,
+        department: formData.department, // String value
       };
 
       const { error } = await supabase
@@ -171,7 +212,7 @@ const FacultyCC = () => {
         category: 'Co-curricular',
         location: '',
         class: '',
-        department: user?.department || '',
+        department: user?.department || '', // String value
       });
       await fetchActivities();
     } catch (err: any) {
@@ -223,27 +264,51 @@ const FacultyCC = () => {
       category: activity.category,
       location: activity.location,
       class: activity.class,
-      department: activity.department,
+      department: activity.department, // String value
     });
     setShowEditForm(true);
   };
 
   const fetchStudents = async (activity: Activity) => {
+    setIsLoading(true);
+    setError('');
+    
     try {
-      const { data, error } = await supabase
+      // First, get all enrolled students for this event
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from('enrollments')
+        .select('user_id')
+        .eq('event_id', activity.event_id);
+
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments:', enrollmentsError);
+        throw new Error(`Failed to fetch enrollments: ${enrollmentsError.message}`);
+      }
+
+      if (!enrollmentsData || enrollmentsData.length === 0) {
+        setStudents([]);
+        setSelectedActivity(activity);
+        setAttendance({});
+        return;
+      }
+
+      // Get user details for enrolled students
+      const enrolledUserIds = enrollmentsData.map(e => e.user_id);
+      const { data: studentsData, error: studentsError } = await supabase
         .from('users')
         .select('user_id, name, uid, year, email')
         .eq('role', 'Student')
-        .eq('year', activity.class || '1');
+        .in('user_id', enrolledUserIds);
 
-      if (error) {
-        console.error('Error fetching students:', error);
-        throw new Error(`Failed to fetch students: ${error.message}`);
+      if (studentsError) {
+        console.error('Error fetching students:', studentsError);
+        throw new Error(`Failed to fetch students: ${studentsError.message}`);
       }
 
-      setStudents(data || []);
+      setStudents(studentsData || []);
       setSelectedActivity(activity);
 
+      // Fetch existing attendance records
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .select('user_id, status')
@@ -259,39 +324,72 @@ const FacultyCC = () => {
         attendanceMap[record.user_id] = record.status === 'Present';
       });
       setAttendance(attendanceMap);
+      setPendingAttendance(attendanceMap); // Initialize pending attendance with current data
     } catch (err: any) {
       console.error('Unexpected error:', err);
       setError(err.message || 'An unexpected error occurred while fetching students.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const markAttendance = async (studentId: string, isPresent: boolean) => {
-    if (!selectedActivity || !user?.uid) {
+  const markAttendance = (studentId: string, isPresent: boolean) => {
+    setPendingAttendance((prev) => ({
+      ...prev,
+      [studentId]: isPresent,
+    }));
+  };
+
+  const submitAttendance = async () => {
+    if (!selectedActivity || !user?.user_id) {
       setError('No activity selected or user not logged in');
       return;
     }
 
+    setIsSubmitting(true);
+    setError('');
+
     try {
-      const { error } = await supabase.from('attendance').upsert({
+      // Prepare all attendance records to be upserted
+      const attendanceRecords = Object.entries(pendingAttendance).map(([studentId, isPresent]) => ({
         user_id: studentId,
         event_id: selectedActivity.event_id,
         status: isPresent ? 'Present' : 'Absent',
-        marked_by: user.uid,
-      });
+        marked_by: user.user_id,
+      }));
+
+      // Upsert all attendance records
+      const { error } = await supabase
+        .from('attendance')
+        .upsert(attendanceRecords, { onConflict: 'user_id,event_id' });
 
       if (error) {
-        console.error('Error marking attendance:', error);
-        throw new Error(`Failed to mark attendance: ${error.message}`);
+        console.error('Error submitting attendance:', error);
+        throw new Error(`Failed to submit attendance: ${error.message}`);
       }
 
-      setAttendance((prev) => ({
-        ...prev,
-        [studentId]: isPresent,
-      }));
+      // Update the main attendance state with pending changes
+      setAttendance(pendingAttendance);
+      
+      // Show success message
+      setError(''); // Clear any previous errors
+      alert('Attendance submitted successfully!');
+      
     } catch (err: any) {
-      console.error('Attendance error:', err);
-      setError(err.message || 'An unexpected error occurred while marking attendance.');
+      console.error('Attendance submission error:', err);
+      setError(err.message || 'An unexpected error occurred while submitting attendance.');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const resetAttendance = () => {
+    setPendingAttendance(attendance); // Reset to original saved state
+  };
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    return JSON.stringify(pendingAttendance) !== JSON.stringify(attendance);
   };
 
   return (
@@ -376,6 +474,14 @@ const FacultyCC = () => {
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              <input
+                type="text"
+                placeholder="Department"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
             </div>
             <textarea
               placeholder="Activity Description"
@@ -459,6 +565,14 @@ const FacultyCC = () => {
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              <input
+                type="text"
+                placeholder="Department"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
             </div>
             <textarea
               placeholder="Activity Description"
@@ -490,7 +604,7 @@ const FacultyCC = () => {
                     category: 'Co-curricular',
                     location: '',
                     class: '',
-                    department: user?.department || '',
+                    department: user?.department || '', // String value
                   });
                 }}
                 className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
@@ -514,6 +628,7 @@ const FacultyCC = () => {
               <div>
                 <h3 className="text-xl font-semibold text-gray-800">{activity.title}</h3>
                 <p className="text-gray-600 mt-1">{activity.description}</p>
+                <p className="text-sm text-gray-600 mt-2">Enrolled Students: {activity.enrolled_students || 0}</p>
               </div>
               <div className="flex space-x-2">
                 <motion.button
@@ -577,50 +692,107 @@ const FacultyCC = () => {
               Mark Attendance - {selectedActivity.title}
             </h2>
 
-            <div className="space-y-3">
-              {students.map((student) => (
-                <div
-                  key={student.user_id}
-                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium text-gray-800">{student.name}</p>
-                    <p className="text-sm text-gray-600">
-                      UID: {student.uid} | Year: {student.year}
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading enrolled students...</p>
+              </div>
+            ) : students.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg">No students have enrolled for this activity yet.</p>
+                <p className="text-gray-500 text-sm mt-2">Students need to enroll before you can mark their attendance.</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-blue-800 text-sm">
+                    <strong>{students.length}</strong> student{students.length !== 1 ? 's' : ''} enrolled
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  {students.map((student) => (
+                    <div
+                      key={student.user_id}
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-800">{student.name}</p>
+                        <p className="text-sm text-gray-600">
+                          UID: {student.uid} | Year: {student.year}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => markAttendance(student.user_id, true)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            pendingAttendance[student.user_id] === true
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-green-100'
+                          }`}
+                        >
+                          Present
+                        </button>
+                        <button
+                          onClick={() => markAttendance(student.user_id, false)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                            pendingAttendance[student.user_id] === false
+                              ? 'bg-red-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-red-100'
+                          }`}
+                        >
+                          Absent
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {students.length > 0 && (
+              <div className="mt-6 space-y-3">
+                {hasUnsavedChanges() && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-800 text-sm">
+                      ⚠️ You have unsaved changes. Click "Submit Attendance" to save them.
                     </p>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => markAttendance(student.user_id, true)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        attendance[student.user_id] === true
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-green-100'
-                      }`}
-                    >
-                      Present
-                    </button>
-                    <button
-                      onClick={() => markAttendance(student.user_id, false)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        attendance[student.user_id] === false
-                          ? 'bg-red-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-red-100'
-                      }`}
-                    >
-                      Absent
-                    </button>
-                  </div>
+                )}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={submitAttendance}
+                    disabled={isSubmitting || !hasUnsavedChanges()}
+                    className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
+                  </button>
+                  <button
+                    onClick={resetAttendance}
+                    disabled={isSubmitting || !hasUnsavedChanges()}
+                    className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={() => setSelectedActivity(null)}
+                    className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                  >
+                    Close
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
-            <button
-              onClick={() => setSelectedActivity(null)}
-              className="mt-6 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Close
-            </button>
+            {students.length === 0 && (
+              <button
+                onClick={() => setSelectedActivity(null)}
+                className="mt-6 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            )}
           </motion.div>
         </motion.div>
       )}

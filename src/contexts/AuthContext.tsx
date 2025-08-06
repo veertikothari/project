@@ -5,7 +5,7 @@ type User = {
   user_id: string
   name: string
   email: string
-  department: string | null
+  department: string
   year: string | null
   phone_number: string
   semester: string | null
