@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Clock, FileText, Plus, Edit, Trash2 } from 'lucide-react';
+import { Upload, Clock, FileText, Plus, Edit, Trash2, Calendar, MapPin, Users, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,6 +19,23 @@ type Submission = {
   submitted_at: string;
 };
 
+type Activity = {
+  event_id: string;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  venue: string;
+  category: string;
+  location: string;
+  created_by: string;
+  class: string;
+  department: string;
+  enrolled_students?: number;
+  attendance_status?: 'Present' | 'Absent' | null;
+  is_enrolled?: boolean;
+};
+
 const StudentCEP = () => {
   const { user } = useAuth();
   const [requirement, setRequirement] = useState<CEPRequirement | null>(null);
@@ -27,6 +44,7 @@ const StudentCEP = () => {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState<Submission | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     activity_date: '',
@@ -35,9 +53,10 @@ const StudentCEP = () => {
   });
 
   useEffect(() => {
-    if (user?.year && user?.user_id) {
+    if (user?.year && user?.user_id && user?.department) {
       fetchRequirement();
       fetchSubmissions();
+      fetchActivities();
     } else {
       alert('User information is missing. Please ensure user data is provided.');
     }
@@ -80,6 +99,87 @@ const StudentCEP = () => {
     }
   };
 
+  const fetchActivities = async () => {
+    if (!user?.department || !user?.year || !user?.user_id) return;
+    try {
+      // Fetch CEP activities that match the student's department and year/class
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('events')
+        .select(`
+          event_id,
+          title,
+          description,
+          date,
+          time,
+          venue,
+          location,
+          class,
+          department
+        `)
+        .eq('category', 'CEP')
+        .eq('department', user.department)
+        .eq('class', String(user.year))
+        .order('date', { ascending: false });
+
+      if (eventsError) {
+        console.error('Error fetching activities:', eventsError);
+        return;
+      }
+
+      // Get enrollment status, attendance status, and enrollment counts for each activity
+      const activitiesWithStatus = await Promise.all(
+        (eventsData || []).map(async (activity) => {
+          // Check if student is enrolled
+          const { data: enrollmentData } = await supabase
+            .from('enrollments')
+            .select('enrollment_id')
+            .eq('event_id', activity.event_id)
+            .eq('user_id', user.user_id)
+            .single();
+
+          // Check attendance status
+          const { data: attendanceData } = await supabase
+            .from('attendance')
+            .select('status')
+            .eq('event_id', activity.event_id)
+            .eq('user_id', user.user_id)
+            .single();
+
+          // Get enrollment count
+          const { count, error: countError } = await supabase
+            .from('enrollments')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', activity.event_id);
+
+          if (countError) {
+            console.error('Error fetching enrollment count:', countError);
+            return {
+              ...activity,
+              category: 'CEP',
+              created_by: '',
+              enrolled_students: 0,
+              attendance_status: attendanceData?.status || null,
+              is_enrolled: !!enrollmentData,
+            } as Activity;
+          }
+
+          return {
+            ...activity,
+            category: 'CEP',
+            created_by: '',
+            enrolled_students: count || 0,
+            attendance_status: attendanceData?.status || null,
+            is_enrolled: !!enrollmentData,
+          } as Activity;
+        })
+      );
+
+      setActivities(activitiesWithStatus);
+    } catch (error: any) {
+      console.error('Error fetching activities:', error);
+    }
+  };
+
   const handleEdit = (submission: Submission) => {
     setEditingSubmission(submission);
     setFormData({
@@ -89,6 +189,32 @@ const StudentCEP = () => {
       file: null
     });
     setShowUploadForm(true);
+  };
+
+  const handleEnroll = async (eventId: string, isCurrentlyEnrolled: boolean) => {
+    if (!user?.user_id) return;
+
+    setIsLoading(true);
+    try {
+      if (isCurrentlyEnrolled) {
+        const { error } = await supabase
+          .from('enrollments')
+          .delete()
+          .eq('event_id', eventId)
+          .eq('user_id', user.user_id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('enrollments')
+          .insert({ event_id: eventId, user_id: user.user_id });
+        if (error) throw error;
+      }
+      await fetchActivities(); // Refresh the list
+    } catch (err: any) {
+      alert(`Error updating enrollment: ${err.message || 'Please try again.'}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDelete = async (submission: Submission) => {
@@ -192,6 +318,39 @@ const StudentCEP = () => {
     ? Math.min((completedHours / requirement.hours_required) * 100, 100)
     : 0;
 
+  const getAttendanceColor = (status: 'Present' | 'Absent' | null) => {
+    switch (status) {
+      case 'Present':
+        return 'text-green-600 bg-green-100'
+      case 'Absent':
+        return 'text-red-600 bg-red-100'
+      default:
+        return 'text-yellow-600 bg-yellow-100'
+    }
+  }
+
+  const getAttendanceIcon = (status: 'Present' | 'Absent' | null) => {
+    switch (status) {
+      case 'Present':
+        return <CheckCircle className="w-5 h-5" />
+      case 'Absent':
+        return <XCircle className="w-5 h-5" />
+      default:
+        return <Clock className="w-5 h-5" />
+    }
+  }
+
+  const getAttendanceText = (status: 'Present' | 'Absent' | null) => {
+    switch (status) {
+      case 'Present':
+        return 'Present'
+      case 'Absent':
+        return 'Absent'
+      default:
+        return 'Pending'
+    }
+  }
+
   if (!requirement) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -274,6 +433,103 @@ const StudentCEP = () => {
         )}
       </motion.div>
 
+      {/* Available CEP Activities */}
+      {activities.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+        >
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Available CEP Activities</h2>
+          <p className="text-gray-600 mb-4">Activities created by your faculty for your department and year</p>
+          <div className="space-y-4">
+            {activities.map((activity, index) => (
+              <motion.div
+                key={activity.event_id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-800">{activity.title}</h3>
+                    <p className="text-gray-600 mt-1">{activity.description}</p>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600 mt-2">
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-4 h-4" />
+                        <span>{new Date(activity.date).toLocaleDateString()} at {activity.time}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <MapPin className="w-4 h-4" />
+                        <span>{activity.venue}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Users className="w-4 h-4" />
+                        <span>{activity.enrolled_students || 0} enrolled</span>
+                      </div>
+                    </div>
+                    {activity.location && (
+                      <p className="text-sm text-gray-600 mt-1">Location: {activity.location}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end space-y-2">
+                    <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${getAttendanceColor(activity.attendance_status || null)}`}>
+                      {getAttendanceIcon(activity.attendance_status || null)}
+                      <span>{getAttendanceText(activity.attendance_status || null)}</span>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
+                      disabled={isLoading}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        activity.is_enrolled
+                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                          : 'bg-green-100 text-green-600 hover:bg-green-200'
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
+                    </motion.button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Attendance Summary for CEP Activities */}
+      {activities.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-200"
+        >
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">CEP Activities Attendance Summary</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {activities.filter(a => a.attendance_status === 'Present').length}
+              </div>
+              <div className="text-sm text-gray-600">Present</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">
+                {activities.filter(a => a.attendance_status === 'Absent').length}
+              </div>
+              <div className="text-sm text-gray-600">Absent</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">
+                {activities.filter(a => !a.attendance_status).length}
+              </div>
+              <div className="text-sm text-gray-600">Pending</div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Upload Button */}
       <div className="flex justify-center">
         <motion.button
@@ -291,7 +547,7 @@ const StudentCEP = () => {
         </motion.button>
       </div>
 
-      {/* Upload/Edit Form */}
+{/* Upload/Edit Form */}
       {showUploadForm && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -381,7 +637,7 @@ const StudentCEP = () => {
           </form>
         </motion.div>
       )}
-
+      
       {/* Previous Submissions */}
       {submissions.length > 0 && (
         <div className="space-y-4 w-full max-h-full">
