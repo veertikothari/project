@@ -42,7 +42,7 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(user));
         console.log('Login successful:', user);
         // Redirect or update app state (e.g., navigate to dashboard)
-        window.location.href = '/dashboard'; // Adjust based on your routing
+        window.location.href = '/'; // Adjust based on your routing
       } else {
         throw new Error('Invalid email or UID. Please check your credentials.');
       }
