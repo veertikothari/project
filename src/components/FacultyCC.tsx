@@ -453,30 +453,32 @@ const FacultyCC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Co-curricular Activities</h1>
-          <p className="text-gray-600">Manage and track student activities</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Co-curricular Activities</h1>
+          <p className="text-sm sm:text-base text-gray-600">Manage and track student activities</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowReports(!showReports)}
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-purple-700 transition-colors"
+            className="bg-purple-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-purple-700 transition-colors text-sm sm:text-base"
           >
-            <FileText className="w-5 h-5" />
-            <span>{showReports ? 'Hide Reports' : 'View Reports'}</span>
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">{showReports ? 'Hide Reports' : 'View Reports'}</span>
+            <span className="sm:hidden">{showReports ? 'Hide' : 'Reports'}</span>
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowCreateForm(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+            className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors text-sm sm:text-base"
           >
-            <Plus className="w-5 h-5" />
-            <span>Create Activity</span>
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Create Activity</span>
+            <span className="sm:hidden">Create</span>
           </motion.button>
         </div>
       </div>
@@ -485,7 +487,7 @@ const FacultyCC = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
         >
           <EventReport />
         </motion.div>
@@ -495,7 +497,7 @@ const FacultyCC = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm"
+          className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 sm:px-4 sm:py-3 rounded-lg text-xs sm:text-sm"
         >
           {error}
         </motion.div>
@@ -505,11 +507,11 @@ const FacultyCC = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
         >
-          <h2 className="text-xl font-semibold mb-4">Create New Activity</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Create New Activity</h2>
           <form onSubmit={createActivity} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <input
                 type="text"
                 placeholder="Activity Title"
@@ -572,18 +574,18 @@ const FacultyCC = () => {
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 type="submit"
                 disabled={isLoading}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm sm:text-base"
               >
                 {isLoading ? 'Creating...' : 'Create Activity'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                className="bg-gray-200 text-gray-700 px-4 py-2 sm:px-6 sm:py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm sm:text-base"
               >
                 Cancel
               </button>
@@ -596,11 +598,11 @@ const FacultyCC = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
         >
-          <h2 className="text-xl font-semibold mb-4">Edit Activity</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4">Edit Activity</h2>
           <form onSubmit={updateActivity} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <input
                 type="text"
                 placeholder="Activity Title"
@@ -663,11 +665,11 @@ const FacultyCC = () => {
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 type="submit"
                 disabled={isLoading}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm sm:text-base"
               >
                 {isLoading ? 'Updating...' : 'Update Activity'}
               </button>
@@ -688,7 +690,7 @@ const FacultyCC = () => {
                     department: user?.department || '', // String value
                   });
                 }}
-                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                className="bg-gray-200 text-gray-700 px-4 py-2 sm:px-6 sm:py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm sm:text-base"
               >
                 Cancel
               </button>
@@ -697,52 +699,52 @@ const FacultyCC = () => {
         </motion.div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {activities.map((activity) => (
           <motion.div
             key={activity.event_id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+            className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
           >
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-800">{activity.title}</h3>
-                <p className="text-gray-600 mt-1">{activity.description}</p>
-                <p className="text-sm text-gray-600 mt-2">Enrolled Students: {activity.enrolled_students || 0}</p>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-3 sm:space-y-0 sm:mb-4">
+              <div className="flex-1">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-800">{activity.title}</h3>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">{activity.description}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mt-2">Enrolled Students: {activity.enrolled_students || 0}</p>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2 sm:space-x-2">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleEditClick(activity)}
-                  className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors flex items-center space-x-1"
+                  className="bg-blue-100 text-blue-600 px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm hover:bg-blue-200 transition-colors flex items-center space-x-1"
                 >
-                  <Edit2 className="w-4 h-4" />
+                  <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>Edit</span>
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => deleteActivity(activity.event_id)}
-                  className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors flex items-center space-x-1"
+                  className="bg-red-100 text-red-600 px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm hover:bg-red-200 transition-colors flex items-center space-x-1"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>Delete</span>
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => fetchStudents(activity)}
-                  className="bg-teal-100 text-teal-600 px-3 py-1 rounded text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1"
+                  className="bg-teal-100 text-teal-600 px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1"
                 >
-                  <Users className="w-4 h-4" />
+                  <Users className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>Attendance</span>
                 </motion.button>
               </div>
             </div>
 
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-6 text-xs sm:text-sm text-gray-600">
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
                 <span>
@@ -767,9 +769,9 @@ const FacultyCC = () => {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            className="bg-white rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
           >
-            <h2 className="text-xl font-semibold mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4">
               Mark Attendance - {selectedActivity.title}
             </h2>
 
@@ -804,10 +806,10 @@ const FacultyCC = () => {
                           UID: {student.uid} | Year: {student.year}
                         </p>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-3">
                         <button
                           onClick={() => markAttendance(student.user_id, true)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                             pendingAttendance[student.user_id] === true
                               ? 'bg-green-600 text-white'
                               : 'bg-gray-200 text-gray-700 hover:bg-green-100'
@@ -817,7 +819,7 @@ const FacultyCC = () => {
                         </button>
                         <button
                           onClick={() => markAttendance(student.user_id, false)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                             pendingAttendance[student.user_id] === false
                               ? 'bg-red-600 text-white'
                               : 'bg-gray-200 text-gray-700 hover:bg-red-100'
@@ -841,24 +843,24 @@ const FacultyCC = () => {
                     </p>
                   </div>
                 )}
-                <div className="flex space-x-3">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                   <button
                     onClick={submitAttendance}
                     disabled={isSubmitting || !hasUnsavedChanges()}
-                    className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    className="flex-1 bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm sm:text-base"
                   >
                     {isSubmitting ? 'Submitting...' : 'Submit Attendance'}
                   </button>
                   <button
                     onClick={resetAttendance}
                     disabled={isSubmitting || !hasUnsavedChanges()}
-                    className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    className="bg-gray-200 text-gray-700 px-4 py-2 sm:px-6 sm:py-3 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm sm:text-base"
                   >
                     Reset
                   </button>
                   <button
                     onClick={() => setSelectedActivity(null)}
-                    className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                    className="bg-gray-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
                   >
                     Close
                   </button>
@@ -869,7 +871,7 @@ const FacultyCC = () => {
             {students.length === 0 && (
               <button
                 onClick={() => setSelectedActivity(null)}
-                className="mt-6 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                className="mt-6 bg-gray-600 text-white px-4 py-2 sm:px-6 sm:py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-base"
               >
                 Close
               </button>

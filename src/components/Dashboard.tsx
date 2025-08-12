@@ -27,14 +27,14 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-full max-h-full overflow-y-auto pb-20">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 max-w-full max-h-full overflow-y-auto pb-20">
       {/* Header with Notifications */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
             {activeTab === 'cc' ? 'Co-curricular' : activeTab === 'cep' ? 'CEP' : 'Profile'}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-xs sm:text-sm text-gray-600">
             {user?.role === 'Faculty' ? 'Faculty Dashboard' : 'Student Dashboard'}
           </p>
         </div>
@@ -53,7 +53,7 @@ const Dashboard = () => {
         </motion.div>
       </AnimatePresence>
       
-      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-2 sm:p-4">
         <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
       

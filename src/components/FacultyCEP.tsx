@@ -1,31 +1,42 @@
-import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Settings, Eye, Clock, CheckCircle, Plus, Calendar, MapPin, Users, Edit2, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
-import { format } from 'date-fns'
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Settings,
+  Eye,
+  Clock,
+  CheckCircle,
+  Plus,
+  Calendar,
+  MapPin,
+  Users,
+  Edit2,
+  Trash2,
+} from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { format } from 'date-fns';
 
 type CEPRequirement = {
-  year: string
-  hours_required: number
-  deadline: string | null
-  department: string
-}
+  year: string;
+  hours_required: number;
+  deadline: string | null;
+  department: string;
+};
 
 type StudentSubmission = {
-  user_id: string
-  name: string
-  uid: string
-  year: string
-  department: string
-  total_hours: number
+  user_id: string;
+  name: string;
+  uid: string;
+  year: string;
+  department: string;
+  total_hours: number;
   submissions: Array<{
-    submission_id: string
-    hours: number
-    file_url: string
-    submitted_at: string
-  }>
-}
+    submission_id: string;
+    hours: number;
+    file_url: string;
+    submitted_at: string;
+  }>;
+};
 
 type Activity = {
   event_id: string;
@@ -51,12 +62,12 @@ type Student = {
 };
 
 const FacultyCEP = () => {
-  const { user } = useAuth()
-  const [requirements, setRequirements] = useState<CEPRequirement[]>([])
-  const [submissions, setSubmissions] = useState<StudentSubmission[]>([])
-  const [showRequirementForm, setShowRequirementForm] = useState(false)
-  const [selectedSubmission, setSelectedSubmission] = useState<StudentSubmission | null>(null)
-  
+  const { user } = useAuth();
+  const [requirements, setRequirements] = useState<CEPRequirement[]>([]);
+  const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
+  const [showRequirementForm, setShowRequirementForm] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<StudentSubmission | null>(null);
+
   // Activity management states
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -73,8 +84,8 @@ const FacultyCEP = () => {
     year: '1',
     hours_required: 20,
     deadline: '',
-    department: user?.department || ''
-  })
+    department: user?.department || '',
+  });
 
   // Activity form data
   const [activityFormData, setActivityFormData] = useState({
@@ -91,50 +102,50 @@ const FacultyCEP = () => {
 
   useEffect(() => {
     if (!user?.department) {
-      console.error('User department not found')
-      return
+      console.error('User department not found');
+      return;
     }
-    fetchRequirements()
-    fetchSubmissions()
+    fetchRequirements();
+    fetchSubmissions();
     if (user?.uid) {
-      fetchActivities()
+      fetchActivities();
     }
-  }, [user?.department, user?.uid])
+  }, [user?.department, user?.uid]);
 
   const fetchRequirements = async () => {
     if (!user?.department) {
-      console.error('User department not found')
-      return
+      console.error('User department not found');
+      return;
     }
 
     const { data, error } = await supabase
       .from('cep_requirements')
       .select('*')
       .eq('department', user.department)
-      .order('year')
+      .order('year');
 
     if (!error && data) {
-      setRequirements(data)
+      setRequirements(data);
     } else {
-      console.error('Error fetching requirements:', error)
+      console.error('Error fetching requirements:', error);
     }
-  }
+  };
 
   const fetchSubmissions = async () => {
     if (!user?.department) {
-      console.error('User department not found')
-      return
+      console.error('User department not found');
+      return;
     }
 
     const { data: studentsData, error: studentsError } = await supabase
       .from('users')
       .select('user_id, name, uid, year, department')
       .eq('role', 'Student')
-      .eq('department', user.department)
+      .eq('department', user.department);
 
     if (studentsError || !studentsData) {
-      console.error('Error fetching students:', studentsError)
-      return
+      console.error('Error fetching students:', studentsError);
+      return;
     }
 
     const submissionsWithStudents = await Promise.all(
@@ -142,49 +153,49 @@ const FacultyCEP = () => {
         const { data: submissionData } = await supabase
           .from('cep_submissions')
           .select('*')
-          .eq('user_id', student.user_id)
+          .eq('user_id', student.user_id);
 
-        const totalHours = submissionData?.reduce((sum, sub) => sum + (sub.hours || 0), 0) || 0
+        const totalHours = submissionData?.reduce((sum, sub) => sum + (sub.hours || 0), 0) || 0;
 
         return {
           ...student,
           total_hours: totalHours,
-          submissions: submissionData || []
-        }
+          submissions: submissionData || [],
+        };
       })
-    )
+    );
 
-    setSubmissions(submissionsWithStudents)
-  }
+    setSubmissions(submissionsWithStudents);
+  };
 
   const updateRequirement = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!user?.department) {
-      console.error('User department not found')
-      return
+      console.error('User department not found');
+      return;
     }
 
     const { error } = await supabase
       .from('cep_requirements')
       .upsert({
         ...formData,
-        department: user.department
-      })
+        department: user.department,
+      });
 
     if (!error) {
-      setShowRequirementForm(false)
-      fetchRequirements()
+      setShowRequirementForm(false);
+      fetchRequirements();
       setFormData({
         year: '1',
         hours_required: 20,
         deadline: '',
-        department: user.department
-      })
+        department: user.department,
+      });
     } else {
-      console.error('Error updating requirement:', error)
+      console.error('Error updating requirement:', error);
     }
-  }
+  };
 
   // Activity management functions
   const fetchActivities = async () => {
@@ -194,7 +205,6 @@ const FacultyCEP = () => {
     }
 
     try {
-      // First, fetch the events
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select(`
@@ -217,7 +227,6 @@ const FacultyCEP = () => {
         throw new Error(`Failed to fetch activities: ${eventsError.message}`);
       }
 
-      // Then, fetch enrollment counts for each event
       const activitiesWithCount = await Promise.all(
         eventsData.map(async (activity) => {
           const { count, error: countError } = await supabase
@@ -398,9 +407,8 @@ const FacultyCEP = () => {
   const fetchStudents = async (activity: Activity) => {
     setIsLoading(true);
     setError('');
-    
+
     try {
-      // First, get all enrolled students for this event
       const { data: enrollmentsData, error: enrollmentsError } = await supabase
         .from('enrollments')
         .select('user_id')
@@ -418,8 +426,7 @@ const FacultyCEP = () => {
         return;
       }
 
-      // Get user details for enrolled students
-      const enrolledUserIds = enrollmentsData.map(e => e.user_id);
+      const enrolledUserIds = enrollmentsData.map((e) => e.user_id);
       const { data: studentsData, error: studentsError } = await supabase
         .from('users')
         .select('user_id, name, uid, year, email')
@@ -434,7 +441,6 @@ const FacultyCEP = () => {
       setStudents(studentsData || []);
       setSelectedActivity(activity);
 
-      // Fetch existing attendance records
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .select('user_id, status')
@@ -476,7 +482,6 @@ const FacultyCEP = () => {
     setError('');
 
     try {
-      // Prepare all attendance records to be upserted
       const attendanceRecords = Object.entries(pendingAttendance).map(([studentId, isPresent]) => ({
         user_id: studentId,
         event_id: selectedActivity.event_id,
@@ -484,7 +489,6 @@ const FacultyCEP = () => {
         marked_by: user.user_id,
       }));
 
-      // Upsert all attendance records
       const { error } = await supabase
         .from('attendance')
         .upsert(attendanceRecords, { onConflict: 'user_id,event_id' });
@@ -494,13 +498,9 @@ const FacultyCEP = () => {
         throw new Error(`Failed to submit attendance: ${error.message}`);
       }
 
-      // Update the main attendance state with pending changes
       setAttendance(pendingAttendance);
-      
-      // Show success message
       setError(''); // Clear any previous errors
       alert('Attendance submitted successfully!');
-      
     } catch (err: any) {
       console.error('Attendance submission error:', err);
       setError(err.message || 'An unexpected error occurred while submitting attendance.');
@@ -510,36 +510,33 @@ const FacultyCEP = () => {
   };
 
   const resetAttendance = () => {
-    setPendingAttendance(attendance); // Reset to original saved state
+    setPendingAttendance(attendance);
   };
 
-  // Check if there are unsaved changes
   const hasUnsavedChanges = () => {
     return JSON.stringify(pendingAttendance) !== JSON.stringify(attendance);
   };
 
   if (!user?.department) {
     return (
-      <div className="text-red-600 p-6">
+      <div className="text-red-600 p-6 text-center">
         Error: Faculty department not found. Please contact support.
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-col md:flex-row space-y-4 md:space-y-0 p-6 bg-gray-100 rounded-lg">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Community Engagement Program - {user.department}
-          </h1>
-          <p className="text-gray-600">Manage social service requirements and track student progress</p>
+          <h1 className="text-2xl font-bold text-gray-800">Community Engagement Program - {user.department}</h1>
+          <p className="text-gray-600 text-sm">Manage social service requirements and track student progress</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowRequirementForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors w-full md:w-auto"
         >
           <Settings className="w-5 h-5" />
           <span>Set Requirements</span>
@@ -554,11 +551,11 @@ const FacultyCEP = () => {
       >
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Current Requirements by Year</h2>
         {requirements.length === 0 ? (
-          <div className="text-gray-600">No requirements set for {user.department}.</div>
+          <div className="text-gray-600 text-center py-4">No requirements set for {user.department}.</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {requirements.map((req) => (
-              <div key={req.year} className="bg-white rounded-lg p-4 border border-teal-100">
+              <div key={req.year} className="bg-white rounded-lg p-4 border border-teal-100 shadow-sm">
                 <div className="text-sm text-gray-600">Year {req.year}</div>
                 <div className="text-2xl font-bold text-teal-600">{req.hours_required} hrs</div>
                 {req.deadline && (
@@ -577,7 +574,7 @@ const FacultyCEP = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 max-w-4xl mx-auto mt-6"
         >
           <h2 className="text-xl font-semibold mb-4">Set Requirements</h2>
           <form onSubmit={updateRequirement} className="space-y-4">
@@ -587,7 +584,7 @@ const FacultyCEP = () => {
                 <select
                   value={formData.year}
                   onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 >
                   <option value="1">Year 1</option>
@@ -602,7 +599,7 @@ const FacultyCEP = () => {
                   type="number"
                   value={formData.hours_required}
                   onChange={(e) => setFormData({ ...formData, hours_required: parseInt(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   min="1"
                   required
                 />
@@ -613,11 +610,11 @@ const FacultyCEP = () => {
                   type="date"
                   value={formData.deadline}
                   onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex justify-end space-x-3">
               <button
                 type="submit"
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -637,16 +634,16 @@ const FacultyCEP = () => {
       )}
 
       {/* CEP Activities Section */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-col md:flex-row space-y-4 md:space-y-0 p-6 bg-gray-100 rounded-lg">
         <div>
           <h2 className="text-xl font-semibold text-gray-800">CEP Activities</h2>
-          <p className="text-gray-600">Manage community engagement activities</p>
+          <p className="text-gray-600 text-sm">Manage community engagement activities</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowCreateForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors w-full md:w-auto"
         >
           <Plus className="w-5 h-5" />
           <span>Create Activity</span>
@@ -657,7 +654,7 @@ const FacultyCEP = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm"
+          className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm text-center"
         >
           {error}
         </motion.div>
@@ -667,7 +664,7 @@ const FacultyCEP = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 max-w-4xl mx-auto mt-6"
         >
           <h2 className="text-xl font-semibold mb-4">Create New CEP Activity</h2>
           <form onSubmit={createActivity} className="space-y-4">
@@ -677,7 +674,7 @@ const FacultyCEP = () => {
                 placeholder="Activity Title"
                 value={activityFormData.title}
                 onChange={(e) => setActivityFormData({ ...activityFormData, title: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
@@ -685,21 +682,21 @@ const FacultyCEP = () => {
                 placeholder="Class (e.g., 1, 2, 3, 4)"
                 value={activityFormData.class}
                 onChange={(e) => setActivityFormData({ ...activityFormData, class: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
                 type="date"
                 value={activityFormData.date}
                 onChange={(e) => setActivityFormData({ ...activityFormData, date: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
                 type="time"
                 value={activityFormData.time}
                 onChange={(e) => setActivityFormData({ ...activityFormData, time: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
@@ -707,7 +704,7 @@ const FacultyCEP = () => {
                 placeholder="Venue"
                 value={activityFormData.venue}
                 onChange={(e) => setActivityFormData({ ...activityFormData, venue: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
@@ -715,14 +712,14 @@ const FacultyCEP = () => {
                 placeholder="Location"
                 value={activityFormData.location}
                 onChange={(e) => setActivityFormData({ ...activityFormData, location: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <input
                 type="text"
                 placeholder="Department"
                 value={activityFormData.department}
                 onChange={(e) => setActivityFormData({ ...activityFormData, department: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -731,10 +728,10 @@ const FacultyCEP = () => {
               value={activityFormData.description}
               onChange={(e) => setActivityFormData({ ...activityFormData, description: e.target.value })}
               rows={3}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-            <div className="flex space-x-3">
+            <div className="flex justify-end space-x-3">
               <button
                 type="submit"
                 disabled={isLoading}
@@ -758,7 +755,7 @@ const FacultyCEP = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 max-w-4xl mx-auto mt-6"
         >
           <h2 className="text-xl font-semibold mb-4">Edit CEP Activity</h2>
           <form onSubmit={updateActivity} className="space-y-4">
@@ -768,7 +765,7 @@ const FacultyCEP = () => {
                 placeholder="Activity Title"
                 value={activityFormData.title}
                 onChange={(e) => setActivityFormData({ ...activityFormData, title: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
@@ -776,21 +773,21 @@ const FacultyCEP = () => {
                 placeholder="Class (e.g., 1, 2, 3, 4)"
                 value={activityFormData.class}
                 onChange={(e) => setActivityFormData({ ...activityFormData, class: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
                 type="date"
                 value={activityFormData.date}
                 onChange={(e) => setActivityFormData({ ...activityFormData, date: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
                 type="time"
                 value={activityFormData.time}
                 onChange={(e) => setActivityFormData({ ...activityFormData, time: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
@@ -798,7 +795,7 @@ const FacultyCEP = () => {
                 placeholder="Venue"
                 value={activityFormData.venue}
                 onChange={(e) => setActivityFormData({ ...activityFormData, venue: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <input
@@ -806,14 +803,14 @@ const FacultyCEP = () => {
                 placeholder="Location"
                 value={activityFormData.location}
                 onChange={(e) => setActivityFormData({ ...activityFormData, location: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <input
                 type="text"
                 placeholder="Department"
                 value={activityFormData.department}
                 onChange={(e) => setActivityFormData({ ...activityFormData, department: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -822,10 +819,10 @@ const FacultyCEP = () => {
               value={activityFormData.description}
               onChange={(e) => setActivityFormData({ ...activityFormData, description: e.target.value })}
               rows={3}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-            <div className="flex space-x-3">
+            <div className="flex justify-end space-x-3">
               <button
                 type="submit"
                 disabled={isLoading}
@@ -866,20 +863,20 @@ const FacultyCEP = () => {
             key={activity.event_id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+            className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-md transition-shadow"
           >
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col md:flex-row justify-between items-start mb-4 space-y-4 md:space-y-0">
               <div>
                 <h3 className="text-xl font-semibold text-gray-800">{activity.title}</h3>
                 <p className="text-gray-600 mt-1">{activity.description}</p>
                 <p className="text-sm text-gray-600 mt-2">Enrolled Students: {activity.enrolled_students || 0}</p>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleEditClick(activity)}
-                  className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors flex items-center space-x-1"
+                  className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors flex items-center space-x-1 w-full md:w-auto"
                 >
                   <Edit2 className="w-4 h-4" />
                   <span>Edit</span>
@@ -888,7 +885,7 @@ const FacultyCEP = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => deleteActivity(activity.event_id)}
-                  className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors flex items-center space-x-1"
+                  className="bg-red-100 text-red-600 px-3 py-1 rounded text-sm hover:bg-red-200 transition-colors flex items-center space-x-1 w-full md:w-auto"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete</span>
@@ -897,7 +894,7 @@ const FacultyCEP = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => fetchStudents(activity)}
-                  className="bg-teal-100 text-teal-600 px-3 py-1 rounded text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1"
+                  className="bg-teal-100 text-teal-600 px-3 py-1 rounded text-sm hover:bg-teal-200 transition-colors flex items-center space-x-1 w-full md:w-auto"
                 >
                   <Users className="w-4 h-4" />
                   <span>Attendance</span>
@@ -905,7 +902,7 @@ const FacultyCEP = () => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
+            <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 text-sm text-gray-600">
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
                 <span>
@@ -925,24 +922,24 @@ const FacultyCEP = () => {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-gray-800">Student Submissions</h2>
         {submissions.length === 0 ? (
-          <div className="text-gray-600">No students found in {user.department}.</div>
+          <div className="text-gray-600 text-center py-4">No students found in {user.department}.</div>
         ) : (
           submissions.map((submission) => {
-            const requirement = requirements.find(req => req.year === submission.year)
-            const requiredHours = requirement?.hours_required || 20
-            const isCompleted = submission.total_hours >= requiredHours
+            const requirement = requirements.find((req) => req.year === submission.year);
+            const requiredHours = requirement?.hours_required || 20;
+            const isCompleted = submission.total_hours >= requiredHours;
 
             return (
               <motion.div
                 key={submission.user_id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+                className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-md transition-shadow"
               >
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start mb-4 space-y-4 md:space-y-0">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">{submission.name}</h3>
-                    <p className="text-gray-600">UID: {submission.uid} | Year: {submission.year}</p>
+                    <p className="text-gray-600 text-sm">UID: {submission.uid} | Year: {submission.year}</p>
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-gray-600">Progress</div>
@@ -969,8 +966,8 @@ const FacultyCEP = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <div className="flex flex-col md:flex-row justify-between items-center">
+                  <div className="flex items-center space-x-4 text-sm text-gray-600 mb-4 md:mb-0">
                     <div className="flex items-center space-x-1">
                       <Clock className="w-4 h-4" />
                       <span>{submission.submissions.length} submissions</span>
@@ -984,14 +981,14 @@ const FacultyCEP = () => {
                   </div>
                   <button
                     onClick={() => setSelectedSubmission(submission)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors w-full md:w-auto"
                   >
                     <Eye className="w-4 h-4" />
                     <span>View Details</span>
                   </button>
                 </div>
               </motion.div>
-            )
+            );
           })
         )}
       </div>
@@ -1008,14 +1005,12 @@ const FacultyCEP = () => {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white rounded-xl shadow-xl p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto"
           >
-            <h2 className="text-xl font-semibold mb-4">
-              Submissions by {selectedSubmission.name}
-            </h2>
-            
+            <h2 className="text-xl font-semibold mb-4">Submissions by {selectedSubmission.name}</h2>
+
             <div className="space-y-4">
               {selectedSubmission.submissions.map((sub) => (
-                <div key={sub.submission_id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
+                <div key={sub.submission_id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex flex-col md:flex-row justify-between items-start mb-2">
                     <div>
                       <p className="font-semibold text-gray-800">Hours: {sub.hours}</p>
                       <p className="text-sm text-gray-600">
@@ -1027,7 +1022,7 @@ const FacultyCEP = () => {
                         href={sub.file_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
+                        className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors mt-2 md:mt-0"
                       >
                         View File
                       </a>
@@ -1039,7 +1034,7 @@ const FacultyCEP = () => {
 
             <button
               onClick={() => setSelectedSubmission(null)}
-              className="mt-6 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              className="mt-6 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full md:w-auto"
             >
               Close
             </button>
@@ -1059,9 +1054,7 @@ const FacultyCEP = () => {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
           >
-            <h2 className="text-xl font-semibold mb-4">
-              Mark Attendance - {selectedActivity.title}
-            </h2>
+            <h2 className="text-xl font-semibold mb-4">Mark Attendance - {selectedActivity.title}</h2>
 
             {isLoading ? (
               <div className="text-center py-8">
@@ -1081,7 +1074,7 @@ const FacultyCEP = () => {
                     <strong>{students.length}</strong> student{students.length !== 1 ? 's' : ''} enrolled
                   </p>
                 </div>
-                
+
                 <div className="space-y-3">
                   {students.map((student) => (
                     <div
@@ -1090,9 +1083,7 @@ const FacultyCEP = () => {
                     >
                       <div>
                         <p className="font-medium text-gray-800">{student.name}</p>
-                        <p className="text-sm text-gray-600">
-                          UID: {student.uid} | Year: {student.year}
-                        </p>
+                        <p className="text-sm text-gray-600">UID: {student.uid} | Year: {student.year}</p>
                       </div>
                       <div className="flex items-center space-x-3">
                         <button
@@ -1126,9 +1117,7 @@ const FacultyCEP = () => {
               <div className="mt-6 space-y-3">
                 {hasUnsavedChanges() && (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-yellow-800 text-sm">
-                      ⚠️ You have unsaved changes. Click "Submit Attendance" to save them.
-                    </p>
+                    <p className="text-yellow-800 text-sm">⚠️ You have unsaved changes. Click "Submit Attendance" to save them.</p>
                   </div>
                 )}
                 <div className="flex space-x-3">
@@ -1168,7 +1157,7 @@ const FacultyCEP = () => {
         </motion.div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default FacultyCEP
+export default FacultyCEP;

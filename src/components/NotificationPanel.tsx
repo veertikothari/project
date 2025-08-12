@@ -45,13 +45,13 @@ const NotificationPanel = () => {
   return (
     <div className="relative">
       {/* Notification Bell */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-gray-800 transition-colors"
-      >
-        <Bell className="w-6 h-6" />
+             <motion.button
+         whileHover={{ scale: 1.05 }}
+         whileTap={{ scale: 0.95 }}
+         onClick={() => setIsOpen(!isOpen)}
+         className="relative p-1 sm:p-2 text-gray-600 hover:text-gray-800 transition-colors"
+       >
+         <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
         {unreadCount > 0 && (
           <motion.div
             initial={{ scale: 0 }}
@@ -66,12 +66,12 @@ const NotificationPanel = () => {
       {/* Notification Panel */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden"
-          >
+                     <motion.div
+             initial={{ opacity: 0, y: -10, scale: 0.95 }}
+             animate={{ opacity: 1, y: 0, scale: 1 }}
+             exit={{ opacity: 0, y: -10, scale: 0.95 }}
+             className="absolute right-0 top-12 w-72 sm:w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden"
+           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="font-semibold text-gray-800">Notifications</h3>

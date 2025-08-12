@@ -158,22 +158,22 @@ const StudentCC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">My Co-curricular Activities</h1>
-        <p className="text-gray-600">View your assigned activities and attendance status</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My Co-curricular Activities</h1>
+        <p className="text-sm sm:text-base text-gray-600">View your assigned activities and attendance status</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {activities.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-lg p-8 text-center border border-gray-200"
+            className="bg-white rounded-xl shadow-lg p-6 sm:p-8 text-center border border-gray-200"
           >
-            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No Activities Yet</h3>
-            <p className="text-gray-600">Check back later for upcoming co-curricular activities.</p>
+            <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-2">No Activities Yet</h3>
+            <p className="text-sm sm:text-base text-gray-600">Check back later for upcoming co-curricular activities.</p>
           </motion.div>
         ) : (
           activities.map((activity, index) => (
@@ -182,21 +182,21 @@ const StudentCC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+              className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
             >
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-3 sm:space-y-0 sm:mb-4">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">{activity.title}</h3>
-                  <p className="text-gray-600 mb-3">{activity.description}</p>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">{activity.title}</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-3">{activity.description}</p>
                   
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
+                    <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
+                      <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span>{format(new Date(activity.date), 'MMM dd, yyyy')} at {activity.time}</span>
                     </div>
                     {activity.venue && (
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4" />
+                      <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span>{activity.venue}</span>
                         {activity.location && <span> - {activity.location}</span>}
                       </div>
@@ -205,7 +205,7 @@ const StudentCC = () => {
                 </div>
 
                 <div className="flex flex-col items-end space-y-2">
-                <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${getAttendanceColor(activity.attendance_status)}`}>
+                <div className={`flex items-center space-x-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg font-medium text-xs sm:text-sm ${getAttendanceColor(activity.attendance_status)}`}>
                   {getAttendanceIcon(activity.attendance_status)}
                   <span>{getAttendanceText(activity.attendance_status)}</span>
                 </div>
@@ -213,7 +213,7 @@ const StudentCC = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
                     activity.is_enrolled
                       ? 'bg-red-100 text-red-600 hover:bg-red-200'
                       : 'bg-green-100 text-green-600 hover:bg-green-200'
@@ -232,27 +232,27 @@ const StudentCC = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200 "
+          className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-6 border border-blue-200"
         >
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Attendance Summary</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Attendance Summary</h3>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-xl sm:text-2xl font-bold text-green-600">
                 {activities.filter(a => a.attendance_status === 'Present').length}
               </div>
-              <div className="text-sm text-gray-600">Present</div>
+              <div className="text-xs sm:text-sm text-gray-600">Present</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-xl sm:text-2xl font-bold text-red-600">
                 {activities.filter(a => a.attendance_status === 'Absent').length}
               </div>
-              <div className="text-sm text-gray-600">Absent</div>
+              <div className="text-xs sm:text-sm text-gray-600">Absent</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">
+              <div className="text-xl sm:text-2xl font-bold text-yellow-600">
                 {activities.filter(a => !a.attendance_status).length}
               </div>
-              <div className="text-sm text-gray-600">Pending</div>
+              <div className="text-xs sm:text-sm text-gray-600">Pending</div>
             </div>
           </div>
         </motion.div>
