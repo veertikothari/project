@@ -7,6 +7,7 @@ import StudentCC from './StudentCC'
 import FacultyCEP from './FacultyCEP'
 import StudentCEP from './StudentCEP'
 import Profile from './Profile'
+import NotificationPanel from './NotificationPanel'
 
 const Dashboard = () => {
   const { user } = useAuth()
@@ -27,6 +28,19 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 max-w-full max-h-full overflow-y-auto pb-20">
+      {/* Header with Notifications */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {activeTab === 'cc' ? 'Co-curricular' : activeTab === 'cep' ? 'CEP' : 'Profile'}
+          </h1>
+          <p className="text-gray-600">
+            {user?.role === 'Faculty' ? 'Faculty Dashboard' : 'Student Dashboard'}
+          </p>
+        </div>
+        <NotificationPanel />
+      </div>
+
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}

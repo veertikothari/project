@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, MapPin, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { Calendar, MapPin, CheckCircle, XCircle, Clock, Bell } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useNotifications } from '../contexts/NotificationContext'
 import { format } from 'date-fns'
 
 type Activity = {
@@ -20,6 +21,7 @@ type Activity = {
 
 const StudentCC = () => {
   const { user } = useAuth()
+  const { sendNotification } = useNotifications()
   const [activities, setActivities] = useState<Activity[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -92,6 +94,19 @@ const StudentCC = () => {
         .from('enrollments')
         .insert({ event_id: eventId, user_id: user.user_id });
       if (error) throw error;
+
+      // Send enrollment confirmation notification
+      const activity = activities.find(a => a.event_id === eventId);
+      if (activity) {
+        await sendNotification({
+          user_id: user.user_id,
+          event_id: eventId,
+          title: 'Enrollment Confirmed',
+          message: `You have successfully enrolled for "${activity.title}". Don't forget to attend on ${format(new Date(activity.date), 'MMM dd, yyyy')} at ${activity.time}.`,
+          type: 'enrollment_confirmed',
+          is_read: false
+        });
+      }
     }
     await fetchActivities(); // Refresh the list
   } catch (err: any) {

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Calendar, MapPin, Users, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, Edit2, Trash2, Bell, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { format } from 'date-fns';
+import EventReport from './EventReport';
 
 type Activity = {
   event_id: string;
@@ -30,6 +32,7 @@ type Student = {
 
 const FacultyCC = () => {
   const { user } = useAuth();
+  const { sendBulkNotifications } = useNotifications();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -40,6 +43,7 @@ const FacultyCC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showReports, setShowReports] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -136,15 +140,19 @@ const FacultyCC = () => {
     setError('');
 
     try {
-      const { error } = await supabase.from('events').insert({
+      const { data: newEvent, error } = await supabase.from('events').insert({
         ...formData,
         created_by: user.uid,
-      });
+        status: 'upcoming'
+      }).select().single();
 
       if (error) {
         console.error('Error creating activity:', error);
         throw new Error(`Failed to create activity: ${error.message}`);
       }
+
+      // Send notifications to all students in the department
+      await sendNotificationsToStudents(newEvent);
 
       setShowCreateForm(false);
       setFormData({
@@ -164,6 +172,36 @@ const FacultyCC = () => {
       setError(err.message || 'An unexpected error occurred while creating the activity.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const sendNotificationsToStudents = async (event: any) => {
+    try {
+      // Get all students in the department
+      const { data: students, error } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('role', 'Student')
+        .eq('department', event.department);
+
+      if (error || !students) {
+        console.error('Error fetching students for notifications:', error);
+        return;
+      }
+
+      // Create notifications for all students
+      const notifications = students.map(student => ({
+        user_id: student.user_id,
+        event_id: event.event_id,
+        title: 'New Co-curricular Activity',
+        message: `A new activity "${event.title}" has been created. Date: ${format(new Date(event.date), 'MMM dd, yyyy')} at ${event.time}. Venue: ${event.venue}`,
+        type: 'event_created' as const,
+        is_read: false
+      }));
+
+      await sendBulkNotifications(notifications);
+    } catch (error) {
+      console.error('Error sending notifications:', error);
     }
   };
 
@@ -371,6 +409,9 @@ const FacultyCC = () => {
       // Update the main attendance state with pending changes
       setAttendance(pendingAttendance);
       
+      // Send notifications to students about attendance being marked
+      await sendAttendanceNotifications();
+      
       // Show success message
       setError(''); // Clear any previous errors
       alert('Attendance submitted successfully!');
@@ -380,6 +421,25 @@ const FacultyCC = () => {
       setError(err.message || 'An unexpected error occurred while submitting attendance.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const sendAttendanceNotifications = async () => {
+    if (!selectedActivity) return;
+
+    try {
+      const notifications = Object.entries(pendingAttendance).map(([studentId, isPresent]) => ({
+        user_id: studentId,
+        event_id: selectedActivity.event_id,
+        title: 'Attendance Marked',
+        message: `Your attendance for "${selectedActivity.title}" has been marked as ${isPresent ? 'Present' : 'Absent'}.`,
+        type: 'attendance_marked' as const,
+        is_read: false
+      }));
+
+      await sendBulkNotifications(notifications);
+    } catch (error) {
+      console.error('Error sending attendance notifications:', error);
     }
   };
 
@@ -399,16 +459,37 @@ const FacultyCC = () => {
           <h1 className="text-2xl font-bold text-gray-800">Co-curricular Activities</h1>
           <p className="text-gray-600">Manage and track student activities</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowCreateForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Create Activity</span>
-        </motion.button>
+        <div className="flex space-x-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowReports(!showReports)}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-purple-700 transition-colors"
+          >
+            <FileText className="w-5 h-5" />
+            <span>{showReports ? 'Hide Reports' : 'View Reports'}</span>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowCreateForm(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Create Activity</span>
+          </motion.button>
+        </div>
       </div>
+
+      {showReports && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+        >
+          <EventReport />
+        </motion.div>
+      )}
 
       {error && (
         <motion.div
@@ -439,7 +520,7 @@ const FacultyCC = () => {
               />
               <input
                 type="text"
-                placeholder="Class (e.g., 1, 2, 3, 4)"
+                placeholder="Class (e.g., 1, 2, 3)"
                 value={formData.class}
                 onChange={(e) => setFormData({ ...formData, class: e.target.value })}
                 className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -530,7 +611,7 @@ const FacultyCC = () => {
               />
               <input
                 type="text"
-                placeholder="Class (e.g., 1, 2, 3, 4)"
+                placeholder="Class (e.g., 1, 2, 3)"
                 value={formData.class}
                 onChange={(e) => setFormData({ ...formData, class: e.target.value })}
                 className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
