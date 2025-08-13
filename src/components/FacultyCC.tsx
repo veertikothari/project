@@ -453,12 +453,12 @@ const FacultyCC = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-20">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
-        <div>
+        {/* <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Co-curricular Activities</h1>
           <p className="text-sm sm:text-base text-gray-600">Manage and track student activities</p>
-        </div>
+        </div> */}
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <motion.button
             whileHover={{ scale: 1.02 }}

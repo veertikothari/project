@@ -158,11 +158,11 @@ const StudentCC = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div>
+    <div className="space-y-4 sm:space-y-6 pb-20">
+      {/* <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My Co-curricular Activities</h1>
         <p className="text-sm sm:text-base text-gray-600">View your assigned activities and attendance status</p>
-      </div>
+      </div> */}
 
       <div className="space-y-3 sm:space-y-4">
         {activities.length === 0 ? (

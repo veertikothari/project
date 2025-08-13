@@ -32,10 +32,10 @@ const Dashboard = () => {
       <div className="flex justify-between items-center mb-4 sm:mb-6">
         <div>
           <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
-            {activeTab === 'cc' ? 'Co-curricular' : activeTab === 'cep' ? 'CEP' : 'Profile'}
+            {activeTab === 'cc' ? user?.role === 'Faculty' ? 'Co-curricular - Faculty' : 'Co-curricular - Student' : activeTab === 'cep' ? user?.role === 'Faculty' ? 'Community Engagement Program -Faculty' : 'Community Engagement Program - Student' : 'Profile'}
           </h1>
           <p className="text-xs sm:text-sm text-gray-600">
-            {user?.role === 'Faculty' ? 'Faculty Dashboard' : 'Student Dashboard'}
+            {user?.name} - {user?.department}
           </p>
         </div>
         <NotificationPanel />

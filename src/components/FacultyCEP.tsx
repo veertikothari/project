@@ -526,12 +526,12 @@ const FacultyCEP = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center flex-col md:flex-row space-y-4 md:space-y-0 p-6 bg-gray-100 rounded-lg">
-        <div>
+    <div className="space-y-6 sm:space-y-6 pb-20">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+        {/* <div>
           <h1 className="text-2xl font-bold text-gray-800">Community Engagement Program - {user.department}</h1>
           <p className="text-gray-600 text-sm">Manage social service requirements and track student progress</p>
-        </div>
+        </div> */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}

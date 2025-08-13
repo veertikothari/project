@@ -365,10 +365,10 @@ const StudentCEP = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div>
+      {/* <div>
         <h1 className="text-2xl font-bold text-gray-800">Community Engagement Program</h1>
         <p className="text-gray-600">Complete your social service hours</p>
-      </div>
+      </div> */}
 
       {/* Requirements Overview */}
       <motion.div
