@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Heart, User } from 'lucide-react'
+import { BookOpen, Heart, User, Shield } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 type NavigationItem = {
   id: string
@@ -9,33 +10,52 @@ type NavigationItem = {
   shortLabel: string
 }
 
-const navigationItems: NavigationItem[] = [
-  {
-    id: 'cc',
-    label: 'Co-curricular Activities',
-    icon: BookOpen,
-    shortLabel: 'Co-Curricular'
-  },
-  {
-    id: 'cep',
-    label: 'Cultural Engagement Program',
-    icon: Heart,
-    shortLabel: 'CEP'
-  },
-  {
-    id: 'profile',
-    label: 'Profile',
-    icon: User,
-    shortLabel: 'Profile'
-  }
-]
-
 type BottomNavigationProps = {
   activeTab: string
   onTabChange: (tab: string) => void
 }
 
 const BottomNavigation = ({ activeTab, onTabChange }: BottomNavigationProps) => {
+  const { user } = useAuth();
+  
+  const navigationItems: NavigationItem[] = user?.role === 'Admin'
+  ? [
+      {
+        id: 'admin',
+        label: 'Admin Dashboard',
+        icon: Shield,
+        shortLabel: 'Admin',
+      },
+      {
+        id: 'profile',
+        label: 'Profile',
+        icon: User,
+        shortLabel: 'Profile',
+      },
+    ]
+  : user?.role === 'Student' || user?.role === 'Faculty'
+  ? [
+      {
+        id: 'cc',
+        label: 'Co-curricular Activities',
+        icon: BookOpen,
+        shortLabel: 'Co-Curricular',
+      },
+      {
+        id: 'cep',
+        label: 'Cultural Engagement Program',
+        icon: Heart,
+        shortLabel: 'CEP',
+      },
+      {
+        id: 'profile',
+        label: 'Profile',
+        icon: User,
+        shortLabel: 'Profile',
+      },
+    ]
+  : [];
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 sm:px-4 py-2 z-50">
       <div className="flex justify-around items-center max-w-md mx-auto">

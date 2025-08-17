@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import BottomNavigation from './BottomNavigation'
@@ -6,12 +6,20 @@ import FacultyCC from './FacultyCC'
 import StudentCC from './StudentCC'
 import FacultyCEP from './FacultyCEP'
 import StudentCEP from './StudentCEP'
+import Admin from './Admin'
 import Profile from './Profile'
 import NotificationPanel from './NotificationPanel'
 
 const Dashboard = () => {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState('cc')
+  const [activeTab, setActiveTab] = useState<string>(''); // Initialize as empty string
+
+  // Set default tab based on user role after user data is available
+  useEffect(() => {
+    if (user) {
+      setActiveTab(user.role === 'Admin' ? 'admin' : 'profile'); // Default to 'admin' for admins, 'profile' for others
+    }
+  }, [user]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -19,10 +27,10 @@ const Dashboard = () => {
         return user?.role === 'Faculty' ? <FacultyCC /> : <StudentCC />
       case 'cep':
         return user?.role === 'Faculty' ? <FacultyCEP /> : <StudentCEP />
+      case 'admin':
+        return user?.role === 'Admin' ? <Admin /> : <div className="text-center py-12"><div className="text-red-600 text-lg font-medium">Access Denied</div><p className="text-gray-600 mt-2">You don't have permission to access this area.</p></div>
       case 'profile':
         return <Profile />
-      default:
-        return user?.role === 'Faculty' ? <FacultyCC /> : <StudentCC />
     }
   }
 
@@ -32,7 +40,9 @@ const Dashboard = () => {
       <div className="flex justify-between items-center mb-4 sm:mb-6">
         <div>
           <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
-            {activeTab === 'cc' ? user?.role === 'Faculty' ? 'Co-curricular - Faculty' : 'Co-curricular - Student' : activeTab === 'cep' ? user?.role === 'Faculty' ? 'Community Engagement Program -Faculty' : 'Community Engagement Program - Student' : 'Profile'}
+            {activeTab === 'cc' ? user?.role === 'Faculty' ? 'Co-curricular - Faculty' : 'Co-curricular - Student' : 
+             activeTab === 'cep' ? user?.role === 'Faculty' ? 'Community Engagement Program - Faculty' : 'Community Engagement Program - Student' : 
+             activeTab === 'admin' ? 'Admin Dashboard' : 'Profile'}
           </h1>
           <p className="text-xs sm:text-sm text-gray-600">
             {user?.name} - {user?.department}
