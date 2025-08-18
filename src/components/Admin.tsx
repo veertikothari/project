@@ -144,10 +144,29 @@ const Admin = () => {
     setNewDepartment('');
   };
 
+  const validateEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePhoneNumber = (phone: string) => {
+  const phoneRegex = /^\d{10}$/;
+  return phoneRegex.test(phone);
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    if (!validateEmail(formData.email)) {
+    alert('Please enter a valid email address (e.g., user@domain.com).');
+    return;
+  }
+
+  if (!validatePhoneNumber(formData.phone_number)) {
+    alert('Please enter a valid 10-digit phone number.');
+    return;
+  }
 
     try {
       setIsLoading(true);
@@ -634,7 +653,13 @@ const Admin = () => {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                           <option value="">Select Semester</option>
-                          {semesters.map((sem) => (
+                          {formData.year === '1' && ['1', '2'].map((sem) => (
+                            <option key={sem} value={sem}>Semester {sem}</option>
+                          ))}
+                          {formData.year === '2' && ['3', '4'].map((sem) => (
+                            <option key={sem} value={sem}>Semester {sem}</option>
+                          ))}
+                          {formData.year === '3' && ['5', '6'].map((sem) => (
                             <option key={sem} value={sem}>Semester {sem}</option>
                           ))}
                         </select>

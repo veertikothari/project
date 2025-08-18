@@ -82,6 +82,17 @@ const StudentCC = () => {
 
   setIsLoading(true);
   try {
+    const { data: attendanceData } = await supabase
+      .from('attendance')
+      .select('status')
+      .eq('event_id', eventId)
+      .eq('user_id', user.user_id)
+      .single();
+
+    if (attendanceData?.status && isCurrentlyEnrolled) {
+      alert('Cannot unenroll as attendance has already been marked.');
+      return;
+    }
     if (isCurrentlyEnrolled) {
       const { error } = await supabase
         .from('enrollments')
@@ -209,6 +220,7 @@ const StudentCC = () => {
                   {getAttendanceIcon(activity.attendance_status)}
                   <span>{getAttendanceText(activity.attendance_status)}</span>
                 </div>
+                {!activity.attendance_status && (
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -221,6 +233,7 @@ const StudentCC = () => {
                 >
                   {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
                 </motion.button>
+                )}
               </div>
             </div>
           </motion.div>

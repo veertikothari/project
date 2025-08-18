@@ -76,10 +76,31 @@ const Profile = () => {
     }
   }
 
+  const validateEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePhoneNumber = (phone: string) => {
+  const phoneRegex = /^\d{10}$/;
+  return phoneRegex.test(phone);
+};
+
   const handleSave = async () => {
     if (!user?.user_id) return
-
     setIsLoading(true)
+
+    if (!validateEmail(editForm.email)) {
+    setIsLoading(false);
+    alert('Please enter a valid email address (e.g., user@domain.com).');
+    return;
+  }
+  if (!validatePhoneNumber(editForm.phone_number)) {
+    setIsLoading(false);
+    alert('Please enter a valid 10-digit phone number.');
+    return;
+  }
+
     try {
       const { error } = await supabase
         .from('users')
