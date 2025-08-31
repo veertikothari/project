@@ -4,6 +4,7 @@ import { FileText, Users, CheckCircle, XCircle, Clock, Download, Share2, Calenda
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { format } from 'date-fns'
+import jsPDF from 'jspdf'
 
 type EventReport = {
   report_id: string
@@ -29,6 +30,7 @@ type Event = {
   class: string | null
   department: string | null
   status: string | null
+  category: string | null
 }
 
 type StudentAttendance = {
@@ -40,7 +42,12 @@ type StudentAttendance = {
   status: 'Present' | 'Absent'
 }
 
-const EventReport = () => {
+type EventReportProps = {
+  category: string
+}
+
+//const EventReport = () => {
+const EventReport: React.FC<EventReportProps> = ({ category }) => {
   const { user } = useAuth()
   const [events, setEvents] = useState<Event[]>([])
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
@@ -69,7 +76,7 @@ const EventReport = () => {
         .from('events')
         .select('*')
         .eq('created_by', user.uid)
-        .eq('category', 'Co-curricular')
+        .eq('category', category)
         .order('date', { ascending: false })
 
       if (error) {
@@ -215,65 +222,92 @@ const EventReport = () => {
     }
   }
 
+  const generatePDF = () => {
+    if (!report || !selectedEvent) return null
+    const doc = new jsPDF()
+    let y = 10
+    doc.setFontSize(16)
+    doc.text(`Event Report: ${selectedEvent.title}`, 10, y)
+    y += 8
+    doc.setFontSize(10)
+    doc.text(`Generated on: ${format(new Date(report.created_at || ''), 'MMM dd, yyyy HH:mm')}` , 10, y)
+    y += 8
+    doc.setFontSize(12)
+    doc.text('Event Details:', 10, y)
+    y += 6
+    doc.setFontSize(10)
+    doc.text(`- Title: ${selectedEvent.title}`, 12, y)
+    y += 6
+    doc.text(`- Date: ${format(new Date(selectedEvent.date), 'MMM dd, yyyy')}`, 12, y)
+    y += 6
+    doc.text(`- Time: ${selectedEvent.time}`, 12, y)
+    y += 6
+    doc.text(`- Venue: ${selectedEvent.venue || 'N/A'}`, 12, y)
+    y += 6
+    doc.text(`- Location: ${selectedEvent.location || 'N/A'}`, 12, y)
+    y += 8
+    doc.setFontSize(12)
+    doc.text('Attendance Summary:', 10, y)
+    y += 6
+    doc.setFontSize(10)
+    doc.text(`- Total Enrolled: ${report.total_enrolled}`, 12, y)
+    y += 6
+    doc.text(`- Total Attended: ${report.total_attended}`, 12, y)
+    y += 6
+    doc.text(`- Total Absent: ${report.total_absent}`, 12, y)
+    y += 6
+    doc.text(`- Attendance Percentage: ${report.attendance_percentage}%`, 12, y)
+    y += 8
+    doc.setFontSize(12)
+    doc.text('Event Summary:', 10, y)
+    y += 6
+    doc.setFontSize(10)
+    doc.text(report.event_summary || 'No summary provided', 12, y)
+    y += 10
+    doc.setFontSize(12)
+    doc.text('Feedback:', 10, y)
+    y += 6
+    doc.setFontSize(10)
+    doc.text(report.feedback || 'No feedback provided', 12, y)
+    y += 10
+    doc.setFontSize(12)
+    doc.text('Student Attendance Details:', 10, y)
+    y += 6
+    doc.setFontSize(10)
+    students.forEach((student, idx) => {
+      if (y > 270) {
+        doc.addPage()
+        y = 10
+      }
+      doc.text(`${student.name} (${student.uid}) - ${student.status}`, 12, y)
+      y += 6
+    })
+    return doc
+  }
+
   const downloadReport = () => {
-    if (!report || !selectedEvent) return
-
-    const reportContent = `
-Event Report: ${selectedEvent.title}
-Generated on: ${format(new Date(report.created_at || ''), 'MMM dd, yyyy HH:mm')}
-
-Event Details:
-- Title: ${selectedEvent.title}
-- Date: ${format(new Date(selectedEvent.date), 'MMM dd, yyyy')}
-- Time: ${selectedEvent.time}
-- Venue: ${selectedEvent.venue || 'N/A'}
-- Location: ${selectedEvent.location || 'N/A'}
-
-Attendance Summary:
-- Total Enrolled: ${report.total_enrolled}
-- Total Attended: ${report.total_attended}
-- Total Absent: ${report.total_absent}
-- Attendance Percentage: ${report.attendance_percentage}%
-
-Event Summary:
-${report.event_summary || 'No summary provided'}
-
-Feedback:
-${report.feedback || 'No feedback provided'}
-
-Student Attendance Details:
-${students.map(student => 
-  `${student.name} (${student.uid}) - ${student.status}`
-).join('\n')}
-    `.trim()
-
-    const blob = new Blob([reportContent], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `event-report-${selectedEvent.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    const doc = generatePDF()
+    if (!doc || !selectedEvent) return
+    doc.save(`event-report-${selectedEvent.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`)
   }
 
   const shareReport = async () => {
     if (!report || !selectedEvent) return
-
     try {
-      const shareData = {
-        title: `Event Report: ${selectedEvent.title}`,
-        text: `Event Report for ${selectedEvent.title} - Attendance: ${report.attendance_percentage}%`,
-        url: window.location.href
-      }
-
-      if (navigator.share) {
-        await navigator.share(shareData)
+      const doc = generatePDF()
+      if (!doc) return
+      const pdfBlob = doc.output('blob')
+      const file = new File([pdfBlob], `event-report-${selectedEvent.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`, { type: 'application/pdf' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Event Report: ${selectedEvent.title}`,
+          text: `Event Report for ${selectedEvent.title} - Attendance: ${report.attendance_percentage}%`,
+          files: [file]
+        })
       } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(shareData.text)
-        alert('Report link copied to clipboard!')
+        // Fallback: download the PDF
+        doc.save(`event-report-${selectedEvent.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.pdf`)
+        alert('PDF downloaded. You can share it manually.')
       }
     } catch (error) {
       console.error('Error sharing report:', error)

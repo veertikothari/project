@@ -17,7 +17,7 @@ type Activity = {
   type: string; // Changed from category to type
   created_by: string;
   class: string;
-  department: string; // Changed from string[]
+  department: string;
   enrolled_students?: number;
   hasAttendance?: boolean; // Added to track attendance
   maxPoints?: number; // Added maximum points
@@ -214,7 +214,6 @@ export const FacultyCC = () => {
       setIsLoading(false);
     }
   };
-
   const sendNotificationsToStudents = async (event: any) => {
     try {
       const { data: students, error } = await supabase
@@ -530,7 +529,7 @@ return (
         animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
       >
-        <EventReport />
+        <EventReport category='Co-curricular'/>
       </motion.div>
     )}
 
@@ -580,7 +579,7 @@ return (
             <input
               type="time"
               value={formData.time}
-
+              
               onChange={(e) => setFormData({ ...formData, time: e.target.value })}
               className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required

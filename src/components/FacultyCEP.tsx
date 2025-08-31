@@ -1,20 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Settings,
-  Eye,
-  Clock,
-  CheckCircle,
-  Plus,
-  Calendar,
-  MapPin,
-  Users,
-  Edit2,
-  Trash2,
-} from 'lucide-react';
+import { Settings,  Eye,  Clock,  CheckCircle,  Plus,  Calendar, MapPin,   Users,  Edit2,  Trash2,  FileText,} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
+import jsPDF from "jspdf"
+import EventReport from './EventReport';
 
 type CEPRequirement = {
   year: string;
@@ -35,6 +26,7 @@ type StudentSubmission = {
     hours: number;
     file_url: string;
     submitted_at: string;
+    approved: boolean;
   }>;
 };
 
@@ -46,11 +38,12 @@ type Activity = {
   time: string;
   venue: string;
   category: string;
-  location: string;
   created_by: string;
   class: string;
   department: string;
   enrolled_students?: number;
+  hasAttendance?: boolean;
+  maxPoints?: number;
 };
 
 type Student = {
@@ -79,7 +72,8 @@ const FacultyCEP = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-
+  const [showReports, setShowReports] = useState(false);
+  const getCurrentDate = (): string => new Date().toISOString().split('T')[0];
   const [formData, setFormData] = useState({
     year: '1',
     hours_required: 20,
@@ -95,9 +89,9 @@ const FacultyCEP = () => {
     time: '',
     venue: '',
     category: 'CEP',
-    location: '',
     class: '',
     department: user?.department || '',
+    maxPoints: 0,
   });
 
   useEffect(() => {
@@ -152,10 +146,11 @@ const FacultyCEP = () => {
       studentsData.map(async (student) => {
         const { data: submissionData } = await supabase
           .from('cep_submissions')
-          .select('*')
+          .select('submission_id, hours, file_url, submitted_at, approved')
           .eq('user_id', student.user_id);
 
-        const totalHours = submissionData?.reduce((sum, sub) => sum + (sub.hours || 0), 0) || 0;
+        const totalHours = submissionData?.reduce((sum, sub) => 
+          sub.approved === true || sub.approved === "true" ? sum + (sub.hours || 0) : sum, 0);
 
         return {
           ...student,
@@ -167,6 +162,20 @@ const FacultyCEP = () => {
 
     setSubmissions(submissionsWithStudents);
   };
+
+  const handleApproval = async (submissionId: string, approve: boolean) => {
+  const { error } = await supabase
+    .from('cep_submissions')
+    .update({ approved: approve })
+    .eq('submission_id', submissionId);
+
+  if (error) {
+    console.error("Error updating approval:", error);
+  } else {
+    fetchSubmissions(); // refresh data
+  }
+};
+
 
   const updateRequirement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,13 +252,20 @@ const FacultyCEP = () => {
               enrolled_students: 0,
             } as Activity;
           }
+          // Check if attendance is marked
+          const { data: attendanceData } = await supabase
+            .from('attendance')
+            .select('user_id')
+            .eq('event_id', activity.event_id)
+            .limit(1); // Check if any attendance exists
 
           return {
             ...activity,
             category: 'CEP',
             created_by: user.uid,
             enrolled_students: count || 0,
-          } as Activity;
+            hasAttendance: attendanceData && attendanceData.length > 0,
+          } as Activity & { hasAttendance: boolean };
         })
       );
 
@@ -289,7 +305,7 @@ const FacultyCEP = () => {
         time: '',
         venue: '',
         category: 'CEP',
-        location: '',
+        maxPoints: 0,
         class: '',
         department: user?.department || '',
       });
@@ -319,7 +335,7 @@ const FacultyCEP = () => {
         date: activityFormData.date,
         time: activityFormData.time,
         venue: activityFormData.venue,
-        location: activityFormData.location,
+        maxPoints: activityFormData.maxPoints,
         category: activityFormData.category,
         class: activityFormData.class,
         department: activityFormData.department,
@@ -345,7 +361,7 @@ const FacultyCEP = () => {
         time: '',
         venue: '',
         category: 'CEP',
-        location: '',
+        maxPoints: 0,
         class: '',
         department: user?.department || '',
       });
@@ -397,7 +413,7 @@ const FacultyCEP = () => {
       time: activity.time,
       venue: activity.venue,
       category: activity.category,
-      location: activity.location,
+      maxPoints: activity.maxPoints || 0,
       class: activity.class,
       department: activity.department,
     });
@@ -541,7 +557,26 @@ const FacultyCEP = () => {
           <Settings className="w-5 h-5" />
           <span>Set Requirements</span>
         </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setShowReports(!showReports)}
+          className="bg-purple-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-purple-700 transition-colors text-sm sm:text-base"
+        >
+          <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="hidden sm:inline">{showReports ? 'Hide Reports' : 'View Reports'}</span>
+          <span className="sm:hidden">{showReports ? 'Hide' : 'Reports'}</span>
+        </motion.button>
       </div>
+        {showReports && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
+        >
+          <EventReport category='CEP'/>
+        </motion.div>
+      )}
 
       {/* Current Requirements */}
       <motion.div
@@ -609,6 +644,7 @@ const FacultyCEP = () => {
                 <input
                   type="date"
                   value={formData.deadline}
+                  min={getCurrentDate()}
                   onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -688,6 +724,7 @@ const FacultyCEP = () => {
               <input
                 type="date"
                 value={activityFormData.date}
+                min= {getCurrentDate()}
                 onChange={(e) => setActivityFormData({ ...activityFormData, date: e.target.value })}
                 className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
@@ -709,13 +746,6 @@ const FacultyCEP = () => {
               />
               <input
                 type="text"
-                placeholder="Location"
-                value={activityFormData.location}
-                onChange={(e) => setActivityFormData({ ...activityFormData, location: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="text"
                 placeholder="Department"
                 value={activityFormData.department}
                 onChange={(e) => setActivityFormData({ ...activityFormData, department: e.target.value })}
@@ -723,6 +753,17 @@ const FacultyCEP = () => {
                 required
               />
             </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700">Maximum Points *</label>
+                <input
+                  type="number"
+                  value={activityFormData.maxPoints}
+                  onChange={(e) => setFormData({ ...activityFormData, maxPoints: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
+                />
+              </div>
             <textarea
               placeholder="Activity Description"
               value={activityFormData.description}
@@ -779,6 +820,7 @@ const FacultyCEP = () => {
               <input
                 type="date"
                 value={activityFormData.date}
+                min={getCurrentDate()}
                 onChange={(e) => setActivityFormData({ ...activityFormData, date: e.target.value })}
                 className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
@@ -800,13 +842,6 @@ const FacultyCEP = () => {
               />
               <input
                 type="text"
-                placeholder="Location"
-                value={activityFormData.location}
-                onChange={(e) => setActivityFormData({ ...activityFormData, location: e.target.value })}
-                className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="text"
                 placeholder="Department"
                 value={activityFormData.department}
                 onChange={(e) => setActivityFormData({ ...activityFormData, department: e.target.value })}
@@ -814,6 +849,17 @@ const FacultyCEP = () => {
                 required
               />
             </div>
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Maximum Points *</label>
+                <input
+                  type="number"
+                  value={activityFormData.maxPoints || 0}
+                  onChange={(e) => setFormData({ ...activityFormData, maxPoints: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  required
+                  className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             <textarea
               placeholder="Activity Description"
               value={activityFormData.description}
@@ -842,7 +888,7 @@ const FacultyCEP = () => {
                     time: '',
                     venue: '',
                     category: 'CEP',
-                    location: '',
+                    maxPoints: 0,
                     class: '',
                     department: user?.department || '',
                   });
@@ -857,14 +903,18 @@ const FacultyCEP = () => {
       )}
 
       {/* Activities List */}
-      <div className="space-y-4">
-        {activities.map((activity) => (
-          <motion.div
-            key={activity.event_id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-md transition-shadow"
-          >
+      <div className="space-y-3 sm:space-y-4">
+            {activities.map((activity) => (
+              <motion.div
+                key={activity.event_id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200 ${
+                  !activity.hasAttendance && new Date(activity.date) > new Date()
+                    ? 'border-yellow-300 bg-yellow-50'
+                    : ''
+                }`}
+              >
             <div className="flex flex-col md:flex-row justify-between items-start mb-4 space-y-4 md:space-y-0">
               <div>
                 <h3 className="text-xl font-semibold text-gray-800">{activity.title}</h3>
@@ -872,6 +922,8 @@ const FacultyCEP = () => {
                 <p className="text-sm text-gray-600 mt-2">Enrolled Students: {activity.enrolled_students || 0}</p>
               </div>
               <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
+                {!activity.hasAttendance && (
+                  <>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -890,6 +942,8 @@ const FacultyCEP = () => {
                   <Trash2 className="w-4 h-4" />
                   <span>Delete</span>
                 </motion.button>
+                  </>
+                )}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -950,12 +1004,6 @@ const FacultyCEP = () => {
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-600">Progress</span>
-                    <span className="text-sm font-medium">
-                      {Math.round((submission.total_hours / requiredHours) * 100)}%
-                    </span>
-                  </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all duration-300 ${
@@ -1017,7 +1065,7 @@ const FacultyCEP = () => {
                         Submitted: {new Date(sub.submitted_at).toLocaleDateString()}
                       </p>
                     </div>
-                    {sub.file_url && (
+                    {/* {sub.file_url && (
                       <a
                         href={sub.file_url}
                         target="_blank"
@@ -1026,7 +1074,52 @@ const FacultyCEP = () => {
                       >
                         View File
                       </a>
-                    )}
+                    )} */}
+                    {sub.file_url && (
+  <div className="mt-3 space-y-2">
+    {/* File preview */}
+    {sub.file_url.endsWith(".pdf") ? (
+      <iframe
+        src={sub.file_url}
+        className="w-full h-64 rounded border"
+        title="PDF Preview"
+      />
+    ) : (
+      <img
+        src={sub.file_url}
+        alt="Submission Preview"
+        className="w-64 h-40 object-contain rounded border"
+      />
+    )}
+
+    {/* Status */}
+    <p className="text-sm">
+      Status:{" "}
+      {sub.approved === true
+        ? "✅ Approved"
+        : sub.approved === false
+        ? "❌ Rejected"
+        : "⏳ Pending"}
+    </p>
+
+    {/* Approval buttons */}
+    <div className="flex gap-2">
+      <button
+        onClick={() => handleApproval(sub.submission_id, true)}
+        className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+      >
+        Approve
+      </button>
+      <button
+        onClick={() => handleApproval(sub.submission_id, false)}
+        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+      >
+        Reject
+      </button>
+    </div>
+  </div>
+)}
+
                   </div>
                 </div>
               ))}
