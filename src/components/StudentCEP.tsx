@@ -17,23 +17,26 @@ type Submission = {
   hours: number;
   file_url: string;
   submitted_at: string;
+  approved?: boolean | null;
 };
 
 type Activity = {
-  event_id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  venue: string;
-  category: string;
-  location: string;
+  event_id: string
+  title: string
+  description: string
+  date: string
+  time: string
+  venue: string
+  type: string
+  //category: string
   created_by: string;
   class: string;
   department: string;
   enrolled_students?: number;
   attendance_status?: 'Present' | 'Absent' | null;
   is_enrolled?: boolean;
+  feedback_given?: boolean;   
+  maxPoints?: number; 
 };
 
 const StudentCEP = () => {
@@ -91,8 +94,9 @@ const StudentCEP = () => {
       if (error) throw error;
       if (data) {
         setSubmissions(data);
-        const totalHours = data.reduce((sum, sub) => sum + (sub.hours || 0), 0);
-        setCompletedHours(totalHours);
+        const totalHours = data.reduce(
+          (sum, sub) => sub.approved === true ? sum + (sub.hours || 0) : sum, 0);
+          setCompletedHours(totalHours);
       }
     } catch (error: any) {
       alert(`Failed to fetch submissions: ${error.message || 'Unknown error'}`);
@@ -114,7 +118,8 @@ const StudentCEP = () => {
           venue,
           location,
           class,
-          department
+          department,
+          maxPoints
         `)
         .eq('category', 'CEP')
         .eq('department', user.department)
@@ -151,25 +156,24 @@ const StudentCEP = () => {
             .select('*', { count: 'exact', head: true })
             .eq('event_id', activity.event_id);
 
-          if (countError) {
-            console.error('Error fetching enrollment count:', countError);
-            return {
-              ...activity,
-              category: 'CEP',
-              created_by: '',
-              enrolled_students: 0,
-              attendance_status: attendanceData?.status || null,
-              is_enrolled: !!enrollmentData,
-            } as Activity;
-          }
+          // Check if feedback is given
+          const { data: feedbackData } = await supabase
+            .from('feedback')
+            .select('feedback_id')
+            .eq('event_id', activity.event_id)
+            .eq('user_id', user.user_id)
+            .single();
 
-          return {
+            return {
             ...activity,
             category: 'CEP',
             created_by: '',
-            enrolled_students: count || 0,
+            enrolled_students: 0,
+            type: '',
             attendance_status: attendanceData?.status || null,
             is_enrolled: !!enrollmentData,
+            feedback_given: !!feedbackData,                
+            earned_points: feedbackData ? activity.maxPoints : 0 
           } as Activity;
         })
       );
@@ -477,6 +481,7 @@ const StudentCEP = () => {
                     <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${getAttendanceColor(activity.attendance_status || null)}`}>
                       {getAttendanceIcon(activity.attendance_status || null)}
                       <span>{getAttendanceText(activity.attendance_status || null)}</span>
+                    
                     </div>
                     <motion.button
                       whileHover={{ scale: 1.02 }}

@@ -548,16 +548,8 @@ const FacultyCEP = () => {
           <h1 className="text-2xl font-bold text-gray-800">Community Engagement Program - {user.department}</h1>
           <p className="text-gray-600 text-sm">Manage social service requirements and track student progress</p>
         </div> */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowRequirementForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors w-full md:w-auto"
-        >
-          <Settings className="w-5 h-5" />
-          <span>Set Requirements</span>
-        </motion.button>
-        <motion.button
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+          <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowReports(!showReports)}
@@ -567,7 +559,27 @@ const FacultyCEP = () => {
           <span className="hidden sm:inline">{showReports ? 'Hide Reports' : 'View Reports'}</span>
           <span className="sm:hidden">{showReports ? 'Hide' : 'Reports'}</span>
         </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setShowRequirementForm(true)}
+          className="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors text-sm sm:text-base"
+        >
+          <Settings className="w-5 h-5" />
+          <span>Set Requirements</span>
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setShowCreateForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors w-full md:w-auto"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Create Activity</span>
+        </motion.button>
+        </div>
       </div>
+
         {showReports && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -577,6 +589,8 @@ const FacultyCEP = () => {
           <EventReport category='CEP'/>
         </motion.div>
       )}
+    
+      
 
       {/* Current Requirements */}
       <motion.div
@@ -609,7 +623,7 @@ const FacultyCEP = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 max-w-4xl mx-auto mt-6"
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200  mx-auto mt-6"
         >
           <h2 className="text-xl font-semibold mb-4">Set Requirements</h2>
           <form onSubmit={updateRequirement} className="space-y-4">
@@ -669,23 +683,6 @@ const FacultyCEP = () => {
         </motion.div>
       )}
 
-      {/* CEP Activities Section */}
-      <div className="flex justify-between items-center flex-col md:flex-row space-y-4 md:space-y-0 p-6 bg-gray-100 rounded-lg">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800">CEP Activities</h2>
-          <p className="text-gray-600 text-sm">Manage community engagement activities</p>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowCreateForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors w-full md:w-auto"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Create Activity</span>
-        </motion.button>
-      </div>
-
       {error && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -700,7 +697,7 @@ const FacultyCEP = () => {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 max-w-4xl mx-auto mt-6"
+          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 mx-auto mt-6"
         >
           <h2 className="text-xl font-semibold mb-4">Create New CEP Activity</h2>
           <form onSubmit={createActivity} className="space-y-4">
@@ -776,7 +773,7 @@ const FacultyCEP = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {isLoading ? 'Creating...' : 'Create Activity'}
               </button>

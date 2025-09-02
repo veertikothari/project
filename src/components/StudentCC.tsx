@@ -25,7 +25,7 @@ type Activity = {
   earned_points?: number
   rating?: number | null
   comments?: string | null
-
+  
 }
 
 const StudentCC = () => {
