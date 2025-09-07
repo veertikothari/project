@@ -16,7 +16,9 @@ import {
   Calendar,
   Save,
   X,
+  Upload,
 } from 'lucide-react';
+import Papa from 'papaparse';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -60,6 +62,9 @@ const Admin = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
@@ -99,6 +104,84 @@ const Admin = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError('');
+    setSuccess('');
+    if (e.target.files && e.target.files.length > 0) {
+      setCsvFile(e.target.files[0]);
+    }
+  };
+
+  const importCsvData = () => {
+    if (!csvFile) {
+      setError('Please select a CSV file to import.');
+      return;
+    }
+
+    setIsImporting(true);
+    setError('');
+    setSuccess('');
+
+    Papa.parse(csvFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = results.data as any[];
+        const usersToInsert: UserFormData[] = [];
+
+        for (const row of rows) {
+          // Basic validation for required fields
+          if (!row.name || !row.email || !row.department || !row.phone_number || !row.role || !row.uid) {
+            setError('CSV contains rows with missing required fields.');
+            setIsImporting(false);
+            return;
+          }
+
+          // Validate email and phone number format
+          const emailValid = validateEmail(row.email);
+          const phoneValid = validatePhoneNumber(row.phone_number);
+
+          if (!emailValid || !phoneValid) {
+            setError('CSV contains rows with invalid email or phone number format.');
+            setIsImporting(false);
+            return;
+          }
+
+          // Map CSV row to UserFormData
+          usersToInsert.push({
+            name: row.name,
+            email: row.email,
+            department: row.department,
+            year: row.year || '',
+            phone_number: row.phone_number,
+            semester: row.semester || '',
+            role: row.role as 'Student' | 'Faculty' | 'Admin',
+            uid: row.uid,
+          });
+        }
+
+        try {
+          const { error } = await supabase.from('users').insert(usersToInsert);
+          if (error) {
+            setError('Failed to import users: ' + error.message);
+          } else {
+            setSuccess('Users imported successfully!');
+            await fetchUsers();
+          }
+        } catch (err: any) {
+          setError('Failed to import users: ' + err.message);
+        } finally {
+          setIsImporting(false);
+          setCsvFile(null);
+        }
+      },
+      error: (err) => {
+        setError('Failed to parse CSV file: ' + err.message);
+        setIsImporting(false);
+      },
+    });
   };
 
   const fetchDepartments = async () => {
@@ -290,18 +373,42 @@ const validatePhoneNumber = (phone: string) => {
           <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
           <p className="text-gray-600">Manage all users in the system</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <UserPlus className="w-5 h-5" />
-          Add User
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <UserPlus className="w-5 h-5" />
+            Add User
+          </motion.button>
+          <label
+            htmlFor="csv-upload"
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 cursor-pointer transition-colors"
+            title="Import users from CSV"
+          >
+            <Upload className="w-5 h-5" />
+            Import CSV
+          </label>
+          <input
+            id="csv-upload"
+            type="file"
+            accept=".csv"
+            onChange={handleCsvFileChange}
+            className="hidden"
+          />
+          <button
+            onClick={importCsvData}
+            disabled={!csvFile || isImporting}
+            className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isImporting ? 'Importing...' : 'Import'}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -56,7 +56,7 @@ const StudentCEP = () => {
   });
 
   useEffect(() => {
-    if (user?.year && user?.user_id && user?.department) {
+    if (user?.user_id && user?.department) {
       fetchRequirement();
       fetchSubmissions();
       fetchActivities();
@@ -123,7 +123,6 @@ const StudentCEP = () => {
         `)
         .eq('category', 'CEP')
         .eq('department', user.department)
-        .eq('class', String(user.year))
         .order('date', { ascending: false });
 
       if (eventsError) {
@@ -473,9 +472,7 @@ const StudentCEP = () => {
                         <span>{activity.enrolled_students || 0} enrolled</span>
                       </div>
                     </div>
-                    {activity.location && (
-                      <p className="text-sm text-gray-600 mt-1">Location: {activity.location}</p>
-                    )}
+                    
                   </div>
                   <div className="flex flex-col items-end space-y-2">
                     <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${getAttendanceColor(activity.attendance_status || null)}`}>
