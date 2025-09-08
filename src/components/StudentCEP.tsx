@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Clock, FileText, Plus, Edit, Trash2, Calendar, MapPin, Users, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, FileText, Plus, Edit, Trash2, Calendar, MapPin, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { format } from 'date-fns';
+import jsPDF from 'jspdf';
 
 type CEPRequirement = {
   year: string;
@@ -35,8 +37,11 @@ type Activity = {
   enrolled_students?: number;
   attendance_status?: 'Present' | 'Absent' | null;
   is_enrolled?: boolean;
-  feedback_given?: boolean;   
+  feedbackSubmitted?: boolean;
   maxPoints?: number; 
+  earned_points?: number;
+  rating?: number | null;
+  comments?: string | null;
 };
 
 const StudentCEP = () => {
@@ -48,6 +53,13 @@ const StudentCEP = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState<Submission | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [showFeedback, setShowFeedback] = useState<{ [key: string]: boolean }>({});
+  const [feedback, setFeedback] = useState<{ eventId: string; rating: number; comments: string }>({
+    eventId: '',
+    rating: 0,
+    comments: ''
+  });
+  const [feedbackError, setFeedbackError] = useState<string>('');
   const [formData, setFormData] = useState({
     title: '',
     activity_date: '',
@@ -149,21 +161,15 @@ const StudentCEP = () => {
             .eq('user_id', user.user_id)
             .single();
 
-          // Get enrollment count
-          const { count, error: countError } = await supabase
-            .from('enrollments')
-            .select('*', { count: 'exact', head: true })
-            .eq('event_id', activity.event_id);
-
           // Check if feedback is given
           const { data: feedbackData } = await supabase
             .from('feedback')
-            .select('feedback_id')
+            .select('rating, comments')
             .eq('event_id', activity.event_id)
             .eq('user_id', user.user_id)
-            .single();
+            .maybeSingle();
 
-            return {
+          return {
             ...activity,
             category: 'CEP',
             created_by: '',
@@ -171,8 +177,9 @@ const StudentCEP = () => {
             type: '',
             attendance_status: attendanceData?.status || null,
             is_enrolled: !!enrollmentData,
-            feedback_given: !!feedbackData,                
-            earned_points: feedbackData ? activity.maxPoints : 0 
+            feedbackSubmitted: !!feedbackData,
+            rating: feedbackData?.rating || null,
+            comments: feedbackData?.comments || null,
           } as Activity;
         })
       );
@@ -181,6 +188,30 @@ const StudentCEP = () => {
     } catch (error: any) {
       console.error('Error fetching activities:', error);
     }
+  };
+
+  // Generate report for a single event (same style as StudentCC)
+  const generateEventReport = (activity: Activity) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('CEP Event Report', 14, 20);
+
+    doc.setFontSize(12);
+    doc.text(`Title: ${activity.title}`, 14, 35);
+    doc.text(`Description: ${activity.description || 'N/A'}`, 14, 45);
+    doc.text(`Date: ${format(new Date(activity.date), 'MMM dd, yyyy')}`, 14, 55);
+    doc.text(`Time: ${activity.time}`, 14, 65);
+    doc.text(`Venue: ${activity.venue}`, 14, 75);
+    doc.text(`Type: ${activity.type || 'N/A'}`, 14, 85);
+    doc.text(`Max Points: ${activity.maxPoints || 0}`, 14, 95);
+
+    doc.text('Student Details', 14, 115);
+    doc.text(`Attendance: ${activity.attendance_status || 'Pending'}`, 14, 125);
+    doc.text(`Earned Points: ${activity.maxPoints || 0}`, 14, 135);
+    doc.text(`Rating: ${activity.feedbackSubmitted ? activity.rating : 'Not submitted'}`, 14, 145);
+    doc.text(`Comments: ${activity.feedbackSubmitted ? activity.comments : 'Not submitted'}`, 14, 155);
+
+    doc.save(`${activity.title}_report.pdf`);
   };
 
   const handleEdit = (submission: Submission) => {
@@ -219,6 +250,56 @@ const StudentCEP = () => {
       setIsLoading(false);
     }
   };
+
+    const submitFeedback = async (eventId: string) => {
+    if (!feedback.rating || !feedback.comments.trim()) {
+      setFeedbackError('Rating and comments are required')
+      return
+    }
+  
+    if (!user?.user_id) {
+      setFeedbackError('User not authenticated')
+      return
+    }
+  
+    // Find the activity to check attendance status
+    const activity = activities.find(a => a.event_id === eventId)
+    if (activity?.attendance_status === 'Absent') {
+      setFeedbackError('Feedback cannot be submitted for absent attendance')
+      return
+    }
+    
+    try {
+      const { error } = await supabase.from('feedback').upsert(
+        {
+          event_id: eventId,
+          user_id: user.user_id,
+          rating: feedback.rating,
+          comments: feedback.comments,
+          submitted_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'event_id,user_id',
+          ignoreDuplicates: false,
+        }
+      )
+      if (error) throw error
+  
+      setActivities((prev) =>
+        prev.map((activity) =>
+          activity.event_id === eventId
+            ? { ...activity, feedbackSubmitted: true, earned_points: activity.maxPoints || 0 }
+            : activity
+        )
+      )
+      setShowFeedback((prev) => ({ ...prev, [eventId]: false }))
+      setFeedback({ eventId: '', rating: 0, comments: '' })
+      setFeedbackError('')
+      alert('Feedback submitted successfully!')
+    } catch (err: any) {
+      setFeedbackError(err.message || 'Failed to submit feedback')
+    }
+  }
 
   const handleDelete = async (submission: Submission) => {
     if (!window.confirm('Are you sure you want to delete this submission?')) return;
@@ -467,32 +548,59 @@ const StudentCEP = () => {
                         <MapPin className="w-4 h-4" />
                         <span>{activity.venue}</span>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-4 h-4" />
-                        <span>{activity.enrolled_students || 0} enrolled</span>
                       </div>
-                    </div>
+                      <div className="flex flex-col items-end space-y-2">
+                        {activity.attendance_status && (
+                          <>
+                            {activity.feedbackSubmitted && activity.maxPoints && (
+                              <div className="text-sm sm:text-base text-gray-800">
+                                Earned Points: {activity.maxPoints ||0}/{activity.maxPoints}
+                              </div>
+                            )}
+                            {!activity.feedbackSubmitted && (
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setShowFeedback((prev) => ({ ...prev, [activity.event_id]: true }))}
+                                className={`bg-blue-100 text-blue-600 px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm hover:bg-blue-200 transition-colors ${
+                                  activity.attendance_status === 'Absent' ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                                disabled={activity.attendance_status === 'Absent'}
+                              >
+                                Submit Feedback
+                              </motion.button>
+                            )}
+                            <div className={`flex items-center space-x-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg font-medium text-xs sm:text-sm ${getAttendanceColor(activity.attendance_status)}`}>
+                              {getAttendanceIcon(activity.attendance_status)}
+                              <span>{getAttendanceText(activity.attendance_status)}</span>
+                            </div>
+                          </>
+                        )}
+                        {!activity.attendance_status && (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
+                            className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
+                              activity.is_enrolled
+                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                : 'bg-green-100 text-green-600 hover:bg-green-200'
+                            }`}
+                          >
+                            {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
+                          </motion.button>
+                        )}
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => generateEventReport(activity)}
+                          className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-lg text-xs sm:text-sm hover:bg-indigo-200 transition-colors"
+                        >
+                          Download Report
+                        </motion.button>
+      
+                      </div>
                     
-                  </div>
-                  <div className="flex flex-col items-end space-y-2">
-                    <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium ${getAttendanceColor(activity.attendance_status || null)}`}>
-                      {getAttendanceIcon(activity.attendance_status || null)}
-                      <span>{getAttendanceText(activity.attendance_status || null)}</span>
-                    
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
-                      disabled={isLoading}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        activity.is_enrolled
-                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                          : 'bg-green-100 text-green-600 hover:bg-green-200'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
-                    </motion.button>
                   </div>
                 </div>
               </motion.div>
@@ -549,7 +657,67 @@ const StudentCEP = () => {
         </motion.button>
       </div>
 
-{/* Upload/Edit Form */}
+      {/* Feedback Modal */}
+      {Object.keys(showFeedback).map((eventId) => showFeedback[eventId] && (
+        <motion.div
+          key={eventId}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-md"
+          >
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">Submit Feedback</h3>
+            {feedbackError && (
+              <div className="text-red-600 text-sm mb-2">{feedbackError}</div>
+            )}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+                <select
+                  value={feedback.rating}
+                  onChange={(e) => setFeedback({ ...feedback, rating: Number(e.target.value), eventId })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value={0}>Select rating</option>
+                  {[1,2,3,4,5].map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Comments</label>
+                <textarea
+                  value={feedback.comments}
+                  onChange={(e) => setFeedback({ ...feedback, comments: e.target.value, eventId })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  rows={4}
+                  placeholder="Share your experience..."
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setShowFeedback((prev) => ({ ...prev, [eventId]: false }))}
+                  className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => submitFeedback(eventId)}
+                  className="px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      ))}
+
+      {/* Upload/Edit Form */}
       {showUploadForm && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}

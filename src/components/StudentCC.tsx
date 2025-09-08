@@ -390,13 +390,11 @@ const markedActivities = activities.filter(a => a.attendance_status)
                     <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
                       <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span>{format(new Date(activity.date), 'MMM dd, yyyy')} at {activity.time}</span>
-                    </div>
-                    {activity.venue && (
+                    </div>                  
                       <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
                         <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span>{activity.venue}</span>                        
-                      </div>
-                    )}
+                      </div>                    
                   </div>
                 </div>
                 <div className="flex flex-col items-end space-y-2">

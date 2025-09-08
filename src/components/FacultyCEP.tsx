@@ -12,6 +12,7 @@ type CEPRequirement = {
   hours_required: number;
   deadline: string | null;
   department: string;
+  maxPoints?: number;
 };
 
 type StudentSubmission = {
@@ -754,8 +755,8 @@ const FacultyCEP = () => {
                 <label className="block text-sm font-medium text-gray-700">Maximum Points *</label>
                 <input
                   type="number"
-                  value={activityFormData.maxPoints}
-                  onChange={(e) => setFormData({ ...activityFormData, maxPoints: parseInt(e.target.value) || 0 })}
+                  value={activityFormData.maxPoints || 0}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, maxPoints: parseInt(e.target.value) || 0 })}
                   min="0"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   required
@@ -851,7 +852,7 @@ const FacultyCEP = () => {
                 <input
                   type="number"
                   value={activityFormData.maxPoints || 0}
-                  onChange={(e) => setFormData({ ...activityFormData, maxPoints: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setActivityFormData({ ...activityFormData, maxPoints: parseInt(e.target.value) || 0 })}
                   min="0"
                   required
                   className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
