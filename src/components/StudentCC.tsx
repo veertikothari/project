@@ -540,7 +540,7 @@ const markedActivities = activities.filter(a => a.attendance_status)
         </>
       )}
     </div>
-      <div className="flex justify-center mt-6">
+<div className="flex justify-center mt-6">
   <motion.button
     whileHover={{ scale: 1.05 }}
     whileTap={{ scale: 0.95 }}

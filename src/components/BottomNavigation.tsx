@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Heart, User, Shield } from 'lucide-react'
+import { BookOpen, Heart, User, UserPlus, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 type NavigationItem = {
@@ -23,7 +23,7 @@ const BottomNavigation = ({ activeTab, onTabChange }: BottomNavigationProps) => 
       {
         id: 'admin',
         label: 'Admin Dashboard',
-        icon: Shield,
+        icon: LayoutDashboard,
         shortLabel: 'Admin',
       },
       {

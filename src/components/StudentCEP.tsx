@@ -53,6 +53,7 @@ const StudentCEP = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState<Submission | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState<{ [key: string]: boolean }>({});
   const [feedback, setFeedback] = useState<{ eventId: string; rating: number; comments: string }>({
     eventId: '',
@@ -83,7 +84,8 @@ const StudentCEP = () => {
       const { data, error } = await supabase
         .from('cep_requirements')
         .select('*')
-        .eq('year', String(user.year));
+        .eq('year', String(user.year))
+        .eq('department', user.department);
       if (error) throw error;
       if (data && data.length > 0) {
         setRequirement(data[0]);
@@ -213,6 +215,39 @@ const StudentCEP = () => {
 
     doc.save(`${activity.title}_report.pdf`);
   };
+
+  const generateCombinedReport = () => {
+    const doc = new jsPDF()
+    doc.setFontSize(16)
+    doc.text("Combined Event Report", 14, 20)
+  
+    let y = 35
+    activities.forEach((activity, index) => {
+      doc.setFontSize(14)
+      doc.text(`${index + 1}. ${activity.title}`, 14, y)
+      y += 8
+  
+      doc.setFontSize(11)
+      doc.text(`Date: ${format(new Date(activity.date), "MMM dd, yyyy")} | Time: ${activity.time}`, 14, y)
+      y += 6
+      doc.text(`Venue: ${activity.venue}`, 14, y)
+      y += 6
+      doc.text(`Attendance: ${activity.attendance_status || "Pending"} | Earned Points: ${activity.maxPoints || 0}`, 14, y)
+      y += 6
+      doc.text(`Rating: ${activity.feedbackSubmitted ? activity.rating : "Not submitted"}`, 14, y)
+      y += 6
+      doc.text(`Comments: ${activity.feedbackSubmitted ? activity.comments : "Not submitted"}`, 14, y)
+      y += 10
+  
+      // Move to new page if overflowing
+      if (y > 260) {
+        doc.addPage()
+        y = 20
+      }
+    })
+  
+    doc.save("all_events_report.pdf")
+  }
 
   const handleEdit = (submission: Submission) => {
     setEditingSubmission(submission);
@@ -453,28 +488,6 @@ const StudentCEP = () => {
         <h1 className="text-2xl font-bold text-gray-800">Community Engagement Program</h1>
         <p className="text-gray-600">Complete your social service hours</p>
       </div> */}
-
-      {/* Requirements Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-200"
-      >
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Requirements</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <div className="text-sm text-gray-600">Minimum Hours Required</div>
-            <div className="text-2xl font-bold text-teal-600">{requirement.hours_required}</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600">Deadline</div>
-            <div className="text-lg font-semibold text-gray-800">
-              {requirement.deadline ? new Date(requirement.deadline).toLocaleDateString() : 'Not set'}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
       {/* Progress Tracking */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -482,15 +495,24 @@ const StudentCEP = () => {
         className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Your Progress</h2>
-          <div
-            className={`text-lg font-bold ${
-              completedHours >= requirement.hours_required ? 'text-green-600' : 'text-orange-600'
-            }`}
-          >
-            {completedHours} / {requirement.hours_required} hours
+          <h2 className="text-lg font-bold text-gray-800">Your Progress</h2>
+          <div className="text-right">
+            <div
+              className={`text-lg font-bold ${
+                completedHours >= requirement.hours_required ? 'text-green-600' : 'text-orange-600'
+              }`}
+            >
+              {completedHours} / {requirement.hours_required} hours
+            </div>
+            <div className="text-sm text-gray-600">
+              Deadline:{" "}
+              {requirement.deadline
+                ? new Date(requirement.deadline).toLocaleDateString()
+                : 'Not set'}
+            </div>
           </div>
         </div>
+
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-gray-600">Completion Progress</span>
@@ -516,98 +538,133 @@ const StudentCEP = () => {
           </div>
         )}
       </motion.div>
-
+<h1 className="text-black-100 font-bold size-large text-2xl">All activities</h1>
       {/* Available CEP Activities */}
-      {activities.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
-        >
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Available CEP Activities</h2>
-          <p className="text-gray-600 mb-4">Activities created by your faculty for your department and year</p>
-          <div className="space-y-4">
-            {activities.map((activity, index) => (
-              <motion.div
-                key={activity.event_id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-800">{activity.title}</h3>
-                    <p className="text-gray-600 mt-1">{activity.description}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 mt-2">
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(activity.date).toLocaleDateString()} at {activity.time}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{activity.venue}</span>
-                      </div>
-                      </div>
-                      <div className="flex flex-col items-end space-y-2">
-                        {activity.attendance_status && (
-                          <>
-                            {activity.feedbackSubmitted && activity.maxPoints && (
-                              <div className="text-sm sm:text-base text-gray-800">
-                                Earned Points: {activity.maxPoints ||0}/{activity.maxPoints}
-                              </div>
-                            )}
-                            {!activity.feedbackSubmitted && (
-                              <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => setShowFeedback((prev) => ({ ...prev, [activity.event_id]: true }))}
-                                className={`bg-blue-100 text-blue-600 px-2 py-1 sm:px-3 sm:py-1 rounded text-xs sm:text-sm hover:bg-blue-200 transition-colors ${
-                                  activity.attendance_status === 'Absent' ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
-                                disabled={activity.attendance_status === 'Absent'}
-                              >
-                                Submit Feedback
-                              </motion.button>
-                            )}
-                            <div className={`flex items-center space-x-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg font-medium text-xs sm:text-sm ${getAttendanceColor(activity.attendance_status)}`}>
-                              {getAttendanceIcon(activity.attendance_status)}
-                              <span>{getAttendanceText(activity.attendance_status)}</span>
-                            </div>
-                          </>
-                        )}
-                        {!activity.attendance_status && (
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
-                            className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors text-xs sm:text-sm ${
-                              activity.is_enrolled
-                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                                : 'bg-green-100 text-green-600 hover:bg-green-200'
-                            }`}
-                          >
-                            {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
-                          </motion.button>
-                        )}
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => generateEventReport(activity)}
-                          className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-lg text-xs sm:text-sm hover:bg-indigo-200 transition-colors"
-                        >
-                          Download Report
-                        </motion.button>
+      {activities.map((activity, index) => {
+  const isExpanded = expandedActivity === activity.event_id;
+
+  return (
+    <motion.div
+      key={activity.event_id}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm"
+    >
+      {/* Card Header */}
+      <div className="flex justify-between items-center">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-800">{activity.title}</h3>
+        </div>
       
-                      </div>
-                    
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+        {/* Right Side: Points | Attendance/Enroll | Report | Arrow */}
+        <div className="flex items-center space-x-3">
+          {/* Earned Points (only after feedback + attendance) */}
+          {activity.attendance_status && activity.feedbackSubmitted && activity.maxPoints !== undefined && (
+            <span className="text-sm font-medium text-green-600">
+              Points: {activity.maxPoints || 0}/{activity.maxPoints}
+            </span>
+          )}
+
+          {/* If attendance already marked → show status; else → show Enroll/Unenroll */}
+          {activity.attendance_status ? (
+            <div
+              className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-medium ${getAttendanceColor(
+                activity.attendance_status
+              )}`}
+            >
+              {getAttendanceIcon(activity.attendance_status)}
+              <span>{getAttendanceText(activity.attendance_status)}</span>
+            </div>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleEnroll(activity.event_id, !!activity.is_enrolled)}
+              disabled={isLoading}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                activity.is_enrolled
+                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                  : 'bg-green-100 text-green-600 hover:bg-green-200'
+              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {activity.is_enrolled ? 'Unenroll' : 'Enroll'}
+            </motion.button>
+          )}
+         
+          {/* Download Report */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => generateEventReport(activity)}
+            className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-lg text-xs hover:bg-indigo-200 transition-colors"
+          >
+            Report
+          </motion.button>
+
+          {/* Dropdown Arrow */}
+          <button
+            onClick={() => setExpandedActivity(isExpanded ? null : activity.event_id)}
+            className="p-1 rounded-full hover:bg-gray-100 transition"
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+          >
+            <svg
+              className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Dropdown Content */}
+      {isExpanded && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className="mt-3 space-y-2 text-sm text-gray-600"
+        >
+          <p className="text-gray-700">{activity.description}</p>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              <span>{new Date(activity.date).toLocaleDateString()} at {activity.time}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MapPin className="w-4 h-4" />
+              <span>{activity.venue}</span>
+            </div>
           </div>
+
+          {/* Feedback Button (only if Present and not submitted) */}
+          {activity.attendance_status && !activity.feedbackSubmitted && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() =>
+                setShowFeedback((prev) => ({ ...prev, [activity.event_id]: true }))
+              }
+              className={`bg-blue-100 text-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors ${
+                activity.attendance_status === 'Absent' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={activity.attendance_status === 'Absent'}
+            >
+              Submit Feedback
+            </motion.button>
+          )}
         </motion.div>
       )}
+    </motion.div>
+  );
+})}
+
 
       {/* Attendance Summary for CEP Activities */}
       {activities.length > 0 && (
@@ -640,6 +697,16 @@ const StudentCEP = () => {
         </motion.div>
       )}
 
+<div className="flex justify-center mt-6">
+  <motion.button
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    onClick={generateCombinedReport}
+    className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700"
+  >
+    Download Combined Report
+  </motion.button>
+</div>
       {/* Upload Button */}
       <div className="flex justify-center">
         <motion.button
@@ -656,66 +723,6 @@ const StudentCEP = () => {
           <span>Add New Submission</span>
         </motion.button>
       </div>
-
-      {/* Feedback Modal */}
-      {Object.keys(showFeedback).map((eventId) => showFeedback[eventId] && (
-        <motion.div
-          key={eventId}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-xl shadow-xl p-4 sm:p-6 w-full max-w-md"
-          >
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Submit Feedback</h3>
-            {feedbackError && (
-              <div className="text-red-600 text-sm mb-2">{feedbackError}</div>
-            )}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
-                <select
-                  value={feedback.rating}
-                  onChange={(e) => setFeedback({ ...feedback, rating: Number(e.target.value), eventId })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                >
-                  <option value={0}>Select rating</option>
-                  {[1,2,3,4,5].map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Comments</label>
-                <textarea
-                  value={feedback.comments}
-                  onChange={(e) => setFeedback({ ...feedback, comments: e.target.value, eventId })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  rows={4}
-                  placeholder="Share your experience..."
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setShowFeedback((prev) => ({ ...prev, [eventId]: false }))}
-                  className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => submitFeedback(eventId)}
-                  className="px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700"
-                >
-                  Submit
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      ))}
 
       {/* Upload/Edit Form */}
       {showUploadForm && (

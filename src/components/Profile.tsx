@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import  { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { User, Mail, Phone, Building, Calendar, Hash, LogOut, Edit, Save, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -7,20 +7,12 @@ import { supabase } from '../lib/supabase'
 const Profile = () => {
   const { user, logout } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
-  const [cepHours, setCepHours] = useState(0)
-  const [ccActivities, setCcActivities] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [editForm, setEditForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
     phone_number: user?.phone_number || ''
   })
-
-  useEffect(() => {
-    if (user?.user_id) {
-      fetchUserStats()
-    }
-  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -31,50 +23,6 @@ const Profile = () => {
       })
     }
   }, [user])
-
-  const fetchUserStats = async () => {
-    if (!user?.user_id) return
-
-    try {
-      // Fetch CEP hours from submissions
-      const { data: cepData, error: cepError } = await supabase
-        .from('cep_submissions')
-        .select('hours')
-        .eq('user_id', user.user_id)
-
-      if (!cepError && cepData) {
-        const totalCepHours = cepData.reduce((sum, submission) => sum + (submission.hours || 0), 0)
-        setCepHours(totalCepHours)
-      }
-
-      // Fetch CC activities count from attendance records where status is 'Present'
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('attendance')
-        .select('event_id')
-        .eq('user_id', user.user_id)
-        .eq('status', 'Present')
-
-      if (!attendanceError && attendanceData && attendanceData.length > 0) {
-        // Get the event IDs
-        const eventIds = attendanceData.map(record => record.event_id)
-        
-        // Fetch events to check their category
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select('event_id, category')
-          .in('event_id', eventIds)
-          .eq('category', 'Co-curricular')
-
-        if (!eventsError && eventsData) {
-          setCcActivities(eventsData.length)
-        }
-      } else {
-        setCcActivities(0)
-      }
-    } catch (error) {
-      console.error('Error fetching user stats:', error)
-    }
-  }
 
   const validateEmail = (email: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -307,28 +255,6 @@ const validatePhoneNumber = (phone: string) => {
           )}
         </div>
       </motion.div>
-
-      {/* Statistics for Students */}
-      {user.role === 'Student' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200"
-        >
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Your Activity Summary</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{ccActivities}</div>
-              <div className="text-sm text-gray-600">CC Activities</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-teal-600">{cepHours}</div>
-              <div className="text-sm text-gray-600">CEP Hours</div>
-            </div>
-          </div>
-        </motion.div>
-      )}
 
       {/* Logout Button */}
       <motion.button
