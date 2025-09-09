@@ -39,7 +39,7 @@ const BottomNavigation = ({ activeTab, onTabChange }: BottomNavigationProps) => 
         id: 'cc',
         label: 'Co-curricular Activities',
         icon: BookOpen,
-        shortLabel: 'Co-Curricular',
+        shortLabel: 'CC',
       },
       {
         id: 'cep',

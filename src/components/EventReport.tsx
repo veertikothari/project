@@ -46,7 +46,6 @@ type EventReportProps = {
   category: string
 }
 
-//const EventReport = () => {
 const EventReport: React.FC<EventReportProps> = ({ category }) => {
   const { user } = useAuth()
   const [events, setEvents] = useState<Event[]>([])

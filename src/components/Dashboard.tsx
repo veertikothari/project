@@ -39,7 +39,7 @@ const Dashboard = () => {
       {/* Header with Notifications */}
       <div className="flex justify-between items-center mb-4 sm:mb-6">
         <div>
-          <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
+          <h1 className="text-lg sm:text-3xl font-bold text-gray-800">
             {activeTab === 'cc' ? user?.role === 'Faculty' ? 'Co-curricular - Faculty' : 'Co-curricular - Student' : 
              activeTab === 'cep' ? user?.role === 'Faculty' ? 'Community Engagement Program - Faculty' : 'Community Engagement Program - Student' : 
              activeTab === 'admin' ? 'Admin Dashboard' : 'Profile'}
